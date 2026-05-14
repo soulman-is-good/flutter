@@ -1,68 +1,36 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 
-class TestOverlayRoute extends OverlayRoute<Null> {
+class TestOverlayRoute extends OverlayRoute<void> {
+  TestOverlayRoute({super.settings});
   @override
-  Iterable<OverlayEntry> createOverlayEntries() sync* {
-    yield new OverlayEntry(builder: _build);
-  }
-  Widget _build(BuildContext context) => new Text('Overlay');
-}
+  Iterable<OverlayEntry> createOverlayEntries() => [OverlayEntry(builder: _build)];
 
-class PersistentBottomSheetTest extends StatefulWidget {
-  PersistentBottomSheetTest({ Key key }) : super(key: key);
-
-  @override
-  PersistentBottomSheetTestState createState() => new PersistentBottomSheetTestState();
-}
-
-class PersistentBottomSheetTestState extends State<PersistentBottomSheetTest> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
-
-  bool setStateCalled = false;
-
-  void showBottomSheet() {
-    _scaffoldKey.currentState.showBottomSheet/*<Null>*/((BuildContext context) {
-      return new Text('bottomSheet');
-    })
-    .closed.then((_) {
-      setState(() {
-        setStateCalled = true;
-      });
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return new Scaffold(
-      key: _scaffoldKey,
-      body: new Text('Sheet')
-    );
-  }
+  Widget _build(BuildContext context) => const Text('Overlay');
 }
 
 void main() {
   testWidgets('Check onstage/offstage handling around transitions', (WidgetTester tester) async {
-    GlobalKey containerKey1 = new GlobalKey();
-    GlobalKey containerKey2 = new GlobalKey();
-    final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
-      '/': (_) => new Container(key: containerKey1, child: new Text('Home')),
-      '/settings': (_) => new Container(key: containerKey2, child: new Text('Settings')),
+    final GlobalKey containerKey1 = GlobalKey();
+    final GlobalKey containerKey2 = GlobalKey();
+    final routes = <String, WidgetBuilder>{
+      '/': (_) => Container(key: containerKey1, child: const Text('Home')),
+      '/settings': (_) => Container(key: containerKey2, child: const Text('Settings')),
     };
 
-    await tester.pumpWidget(new MaterialApp(routes: routes));
+    await tester.pumpWidget(MaterialApp(routes: routes));
 
     expect(find.text('Home'), isOnstage);
     expect(find.text('Settings'), findsNothing);
     expect(find.text('Overlay'), findsNothing);
 
-    expect(Navigator.canPop(containerKey1.currentContext), isFalse);
-    Navigator.pushNamed(containerKey1.currentContext, '/settings');
-    expect(Navigator.canPop(containerKey1.currentContext), isTrue);
+    expect(Navigator.canPop(containerKey1.currentContext!), isFalse);
+    Navigator.pushNamed(containerKey1.currentContext!, '/settings');
+    expect(Navigator.canPop(containerKey1.currentContext!), isTrue);
 
     await tester.pump();
 
@@ -82,7 +50,7 @@ void main() {
     expect(find.text('Settings'), isOnstage);
     expect(find.text('Overlay'), findsNothing);
 
-    Navigator.push(containerKey2.currentContext, new TestOverlayRoute());
+    Navigator.push(containerKey2.currentContext!, TestOverlayRoute());
 
     await tester.pump();
 
@@ -96,8 +64,8 @@ void main() {
     expect(find.text('Settings'), isOnstage);
     expect(find.text('Overlay'), isOnstage);
 
-    expect(Navigator.canPop(containerKey2.currentContext), isTrue);
-    Navigator.pop(containerKey2.currentContext);
+    expect(Navigator.canPop(containerKey2.currentContext!), isTrue);
+    Navigator.pop(containerKey2.currentContext!);
     await tester.pump();
 
     expect(find.text('Home'), findsNothing);
@@ -110,8 +78,9 @@ void main() {
     expect(find.text('Settings'), isOnstage);
     expect(find.text('Overlay'), findsNothing);
 
-    expect(Navigator.canPop(containerKey2.currentContext), isTrue);
-    Navigator.pop(containerKey2.currentContext);
+    expect(Navigator.canPop(containerKey2.currentContext!), isTrue);
+    Navigator.pop(containerKey2.currentContext!);
+    await tester.pump();
     await tester.pump();
 
     expect(find.text('Home'), isOnstage);
@@ -124,310 +93,155 @@ void main() {
     expect(find.text('Settings'), findsNothing);
     expect(find.text('Overlay'), findsNothing);
 
-    expect(Navigator.canPop(containerKey1.currentContext), isFalse);
+    expect(Navigator.canPop(containerKey1.currentContext!), isFalse);
   });
 
-  testWidgets('Check back gesture works on iOS', (WidgetTester tester) async {
-    GlobalKey containerKey1 = new GlobalKey();
-    GlobalKey containerKey2 = new GlobalKey();
-    final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
-      '/': (_) => new Scaffold(key: containerKey1, body: new Text('Home')),
-      '/settings': (_) => new Scaffold(key: containerKey2, body: new Text('Settings')),
-    };
+  testWidgets(
+    'Check back gesture disables Heroes',
+    (WidgetTester tester) async {
+      final GlobalKey containerKey1 = GlobalKey();
+      final GlobalKey containerKey2 = GlobalKey();
+      const kHeroTag = 'hero';
+      final routes = <String, WidgetBuilder>{
+        '/': (_) => SizedBox(
+          key: containerKey1,
+          child: const ColoredBox(
+            color: Color(0xff00ffff),
+            child: Hero(tag: kHeroTag, child: Text('Home')),
+          ),
+        ),
+        '/settings': (_) => SizedBox(
+          key: containerKey2,
+          child: Container(
+            padding: const EdgeInsets.all(100.0),
+            color: const Color(0xffff00ff),
+            child: const Hero(tag: kHeroTag, child: Text('Settings')),
+          ),
+        ),
+      };
 
-    await tester.pumpWidget(new MaterialApp(
-      routes: routes,
-      theme: new ThemeData(platform: TargetPlatform.iOS),
-    ));
+      await tester.pumpWidget(MaterialApp(routes: routes));
 
-    Navigator.pushNamed(containerKey1.currentContext, '/settings');
+      Navigator.pushNamed(containerKey1.currentContext!, '/settings');
 
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
 
-    expect(find.text('Home'), findsNothing);
-    expect(find.text('Settings'), isOnstage);
+      expect(find.text('Settings'), isOnstage);
 
-    // Drag from left edge to invoke the gesture.
-    TestGesture gesture = await tester.startGesture(new Point(5.0, 100.0));
-    await gesture.moveBy(new Offset(50.0, 0.0));
-    await tester.pump();
+      // Settings text is heroing to its new location
+      Offset settingsOffset = tester.getTopLeft(find.text('Settings'));
+      expect(settingsOffset.dx, greaterThan(0.0));
+      expect(settingsOffset.dx, lessThan(100.0));
+      expect(settingsOffset.dy, greaterThan(0.0));
+      expect(settingsOffset.dy, lessThan(100.0));
 
-    // Home is now visible.
-    expect(find.text('Home'), isOnstage);
-    expect(find.text('Settings'), isOnstage);
-  });
+      await tester.pump(const Duration(seconds: 1));
 
-  testWidgets('Check back gesture does nothing on android', (WidgetTester tester) async {
-    GlobalKey containerKey1 = new GlobalKey();
-    GlobalKey containerKey2 = new GlobalKey();
-    final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
-      '/': (_) => new Scaffold(key: containerKey1, body: new Text('Home')),
-      '/settings': (_) => new Scaffold(key: containerKey2, body: new Text('Settings')),
-    };
+      expect(find.text('Home'), findsNothing);
+      expect(find.text('Settings'), isOnstage);
 
-    await tester.pumpWidget(new MaterialApp(
-      routes: routes,
-      theme: new ThemeData(platform: TargetPlatform.android),
-    ));
+      // Drag from left edge to invoke the gesture.
+      final TestGesture gesture = await tester.startGesture(const Offset(5.0, 100.0));
+      await gesture.moveBy(const Offset(50.0, 0.0));
+      await tester.pump();
 
-    Navigator.pushNamed(containerKey1.currentContext, '/settings');
+      // Home is now visible.
+      expect(find.text('Home'), isOnstage);
+      expect(find.text('Settings'), isOnstage);
 
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+      // Home page is sliding in from the left, no heroes.
+      final Offset homeOffset = tester.getTopLeft(find.text('Home'));
+      expect(homeOffset.dx, lessThan(0.0));
+      expect(homeOffset.dy, 0.0);
 
-    expect(find.text('Home'), findsNothing);
-    expect(find.text('Settings'), isOnstage);
+      // Settings page is sliding off to the right, no heroes.
+      settingsOffset = tester.getTopLeft(find.text('Settings'));
+      expect(settingsOffset.dx, greaterThan(100.0));
+      expect(settingsOffset.dy, 100.0);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.iOS,
+      TargetPlatform.macOS,
+    }),
+  );
 
-    // Drag from left edge to invoke the gesture.
-    TestGesture gesture = await tester.startGesture(new Point(5.0, 100.0));
-    await gesture.moveBy(new Offset(50.0, 0.0));
-    await tester.pump();
+  testWidgets(
+    "Check back gesture doesn't start during transitions",
+    (WidgetTester tester) async {
+      final GlobalKey containerKey1 = GlobalKey();
+      final GlobalKey containerKey2 = GlobalKey();
+      final routes = <String, WidgetBuilder>{
+        '/': (_) => SizedBox(key: containerKey1, child: const Text('Home')),
+        '/settings': (_) => SizedBox(key: containerKey2, child: const Text('Settings')),
+      };
 
-    expect(find.text('Home'), findsNothing);
-    expect(find.text('Settings'), isOnstage);
-  });
+      await tester.pumpWidget(MaterialApp(routes: routes));
 
-  testWidgets('Check page transition positioning on iOS', (WidgetTester tester) async {
-    GlobalKey containerKey1 = new GlobalKey();
-    GlobalKey containerKey2 = new GlobalKey();
-    final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
-      '/': (_) => new Scaffold(key: containerKey1, body: new Text('Home')),
-      '/settings': (_) => new Scaffold(key: containerKey2, body: new Text('Settings')),
-    };
+      Navigator.pushNamed(containerKey1.currentContext!, '/settings');
 
-    await tester.pumpWidget(new MaterialApp(
-      routes: routes,
-      theme: new ThemeData(platform: TargetPlatform.iOS),
-    ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    Navigator.pushNamed(containerKey1.currentContext, '/settings');
+      // We are mid-transition, both pages are on stage.
+      expect(find.text('Home'), isOnstage);
+      expect(find.text('Settings'), isOnstage);
 
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 16));
+      // Drag from left edge to invoke the gesture. (near bottom so we grab
+      // the Settings page as it comes up).
+      TestGesture gesture = await tester.startGesture(const Offset(5.0, 550.0));
+      await gesture.moveBy(const Offset(500.0, 0.0));
+      await gesture.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1000));
 
-    expect(find.text('Home'), isOnstage);
-    expect(find.text('Settings'), isOnstage);
+      // The original forward navigation should have completed, instead of the
+      // back gesture, since we were mid transition.
+      expect(find.text('Home'), findsNothing);
+      expect(find.text('Settings'), isOnstage);
 
-    // Home page is staying in place.
-    Point homeOffset = tester.getTopLeft(find.text('Home'));
-    expect(homeOffset.x, 0.0);
-    expect(homeOffset.y, 0.0);
+      // Try again now that we're settled.
+      gesture = await tester.startGesture(const Offset(5.0, 550.0));
+      await gesture.moveBy(const Offset(500.0, 0.0));
+      await gesture.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1000));
 
-    // Settings page is sliding up from the bottom.
-    Point settingsOffset = tester.getTopLeft(find.text('Settings'));
-    expect(settingsOffset.x, 0.0);
-    expect(settingsOffset.y, greaterThan(0.0));
-
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.text('Home'), findsNothing);
-    expect(find.text('Settings'), isOnstage);
-
-    // Settings page is in position.
-    settingsOffset = tester.getTopLeft(find.text('Settings'));
-    expect(settingsOffset.x, 0.0);
-    expect(settingsOffset.y, 0.0);
-
-    Navigator.pop(containerKey1.currentContext);
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 16));
-
-    // Home page is staying in place.
-    homeOffset = tester.getTopLeft(find.text('Home'));
-    expect(homeOffset.x, 0.0);
-    expect(homeOffset.y, 0.0);
-
-    // Settings page is sliding down off the bottom.
-    settingsOffset = tester.getTopLeft(find.text('Settings'));
-    expect(settingsOffset.x, 0.0);
-    expect(settingsOffset.y, greaterThan(0.0));
-
-    await tester.pump(const Duration(seconds: 1));
-  });
-
-  testWidgets('Check back gesture disables Heroes', (WidgetTester tester) async {
-    GlobalKey containerKey1 = new GlobalKey();
-    GlobalKey containerKey2 = new GlobalKey();
-    const String kHeroTag = 'hero';
-    final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
-      '/': (_) => new Scaffold(
-        key: containerKey1,
-        body: new Container(
-          decoration: new BoxDecoration(backgroundColor: const Color(0xff00ffff)),
-          child: new Hero(
-            tag: kHeroTag,
-            child: new Text('Home')
-          )
-        )
-      ),
-      '/settings': (_) => new Scaffold(
-        key: containerKey2,
-        body: new Container(
-          padding: const EdgeInsets.all(100.0),
-          decoration: new BoxDecoration(backgroundColor: const Color(0xffff00ff)),
-          child: new Hero(
-            tag: kHeroTag,
-            child: new Text('Settings')
-          )
-        )
-      ),
-    };
-
-    await tester.pumpWidget(new MaterialApp(
-      routes: routes,
-      theme: new ThemeData(platform: TargetPlatform.iOS),
-    ));
-
-    Navigator.pushNamed(containerKey1.currentContext, '/settings');
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 16));
-
-    expect(find.text('Settings'), isOnstage);
-
-    // Settings text is heroing to its new location
-    Point settingsOffset = tester.getTopLeft(find.text('Settings'));
-    expect(settingsOffset.x, greaterThan(0.0));
-    expect(settingsOffset.x, lessThan(100.0));
-    expect(settingsOffset.y, greaterThan(0.0));
-    expect(settingsOffset.y, lessThan(100.0));
-
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.text('Home'), findsNothing);
-    expect(find.text('Settings'), isOnstage);
-
-    // Drag from left edge to invoke the gesture.
-    TestGesture gesture = await tester.startGesture(new Point(5.0, 100.0));
-    await gesture.moveBy(new Offset(50.0, 0.0));
-    await tester.pump();
-
-    // Home is now visible.
-    expect(find.text('Home'), isOnstage);
-    expect(find.text('Settings'), isOnstage);
-
-    // Home page is sliding in from the left, no heroes.
-    Point homeOffset = tester.getTopLeft(find.text('Home'));
-    expect(homeOffset.x, lessThan(0.0));
-    expect(homeOffset.y, 0.0);
-
-    // Settings page is sliding off to the right, no heroes.
-    settingsOffset = tester.getTopLeft(find.text('Settings'));
-    expect(settingsOffset.x, greaterThan(100.0));
-    expect(settingsOffset.y, 100.0);
-  });
-
-  testWidgets('Check back gesture doesnt start during transitions', (WidgetTester tester) async {
-    GlobalKey containerKey1 = new GlobalKey();
-    GlobalKey containerKey2 = new GlobalKey();
-    final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
-      '/': (_) => new Scaffold(key: containerKey1, body: new Text('Home')),
-      '/settings': (_) => new Scaffold(key: containerKey2, body: new Text('Settings')),
-    };
-
-    await tester.pumpWidget(new MaterialApp(
-      routes: routes,
-      theme: new ThemeData(platform: TargetPlatform.iOS),
-    ));
-
-    Navigator.pushNamed(containerKey1.currentContext, '/settings');
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    // We are mid-transition, both pages are on stage.
-    expect(find.text('Home'), isOnstage);
-    expect(find.text('Settings'), isOnstage);
-
-    // Drag from left edge to invoke the gesture. (near bottom so we grab
-    // the Settings page as it comes up).
-    TestGesture gesture = await tester.startGesture(new Point(5.0, 550.0));
-    await gesture.moveBy(new Offset(500.0, 0.0));
-    await gesture.up();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 1000));
-
-    // The original forward navigation should have completed, instead of the
-    // back gesture, since we were mid transition.
-    expect(find.text('Home'), findsNothing);
-    expect(find.text('Settings'), isOnstage);
-
-    // Try again now that we're settled.
-    gesture = await tester.startGesture(new Point(5.0, 550.0));
-    await gesture.moveBy(new Offset(500.0, 0.0));
-    await gesture.up();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 1000));
-
-    expect(find.text('Home'), isOnstage);
-    expect(find.text('Settings'), findsNothing);
-  });
-
-  // Tests bug https://github.com/flutter/flutter/issues/6451
-  testWidgets('Check back gesture with a persistent bottom sheet showing', (WidgetTester tester) async {
-    GlobalKey containerKey1 = new GlobalKey();
-    GlobalKey containerKey2 = new GlobalKey();
-    final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
-      '/': (_) => new Scaffold(key: containerKey1, body: new Text('Home')),
-      '/sheet': (_) => new PersistentBottomSheetTest(key: containerKey2),
-    };
-
-    await tester.pumpWidget(new MaterialApp(
-      routes: routes,
-      theme: new ThemeData(platform: TargetPlatform.iOS),
-    ));
-
-    Navigator.pushNamed(containerKey1.currentContext, '/sheet');
-
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.text('Home'), findsNothing);
-    expect(find.text('Sheet'), isOnstage);
-
-    // Show the bottom sheet.
-    PersistentBottomSheetTestState sheet = containerKey2.currentState;
-    sheet.showBottomSheet();
-
-    await tester.pump(const Duration(seconds: 1));
-
-    // Drag from left edge to invoke the gesture.
-    TestGesture gesture = await tester.startGesture(new Point(5.0, 100.0));
-    await gesture.moveBy(new Offset(500.0, 0.0));
-    await gesture.up();
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.text('Home'), isOnstage);
-    expect(find.text('Sheet'), findsNothing);
-
-    // Sheet called setState and didn't crash.
-    expect(sheet.setStateCalled, isTrue);
-  });
+      expect(find.text('Home'), isOnstage);
+      expect(find.text('Settings'), findsNothing);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.iOS,
+      TargetPlatform.macOS,
+    }),
+  );
 
   testWidgets('Test completed future', (WidgetTester tester) async {
-    final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
-      '/': (_) => new Center(child: new Text('home')),
-      '/next': (_) => new Center(child: new Text('next')),
+    final routes = <String, WidgetBuilder>{
+      '/': (_) => const Center(child: Text('home')),
+      '/next': (_) => const Center(child: Text('next')),
     };
 
-    await tester.pumpWidget(new MaterialApp(routes: routes));
+    await tester.pumpWidget(MaterialApp(routes: routes));
 
-    PageRoute<Null> route = new MaterialPageRoute<Null>(
-      settings: new RouteSettings(name: '/page'),
-      builder: (BuildContext context) => new Center(child: new Text('page')),
+    final PageRoute<void> route = PageRouteBuilder<void>(
+      settings: const RouteSettings(name: '/page'),
+      pageBuilder:
+          (
+            BuildContext context,
+            Animation<double> animation,
+            Animation<double> secondaryAnimation,
+          ) => const Center(child: Text('page')),
     );
 
-    int popCount = 0;
-    route.popped.then((_) {
-      ++popCount;
+    var popCount = 0;
+    route.popped.whenComplete(() {
+      popCount += 1;
     });
 
-    int completeCount = 0;
-    route.completed.then((_) {
-      ++completeCount;
+    var completeCount = 0;
+    route.completed.whenComplete(() {
+      completeCount += 1;
     });
 
     expect(popCount, 0);

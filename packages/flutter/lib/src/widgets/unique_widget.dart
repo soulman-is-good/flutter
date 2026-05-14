@@ -1,8 +1,6 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-import 'package:meta/meta.dart';
 
 import 'framework.dart';
 
@@ -22,13 +20,9 @@ import 'framework.dart';
 abstract class UniqueWidget<T extends State<StatefulWidget>> extends StatefulWidget {
   /// Creates a widget that has exactly one inflated instance in the tree.
   ///
-  /// The [key] argument cannot be null because it identifies the unique
-  /// inflated instance of this widget.
-  UniqueWidget({
-    @required GlobalKey key
-  }) : super(key: key) {
-    assert(key != null);
-  }
+  /// The [key] argument is required because it identifies the unique inflated
+  /// instance of this widget.
+  const UniqueWidget({required GlobalKey<T> super.key});
 
   @override
   T createState();
@@ -36,8 +30,8 @@ abstract class UniqueWidget<T extends State<StatefulWidget>> extends StatefulWid
   /// The state for the unique inflated instance of this widget.
   ///
   /// Might be null if the widget is not currently in the tree.
-  T get currentState {
-    GlobalKey globalKey = key;
-    return globalKey.currentState; // ignore: return_of_invalid_type, https://github.com/flutter/flutter/issues/5771
+  T? get currentState {
+    final globalKey = key! as GlobalKey<T>;
+    return globalKey.currentState;
   }
 }

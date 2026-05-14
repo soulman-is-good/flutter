@@ -1,22 +1,31 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Future<Null> guardedHelper(WidgetTester tester) {
+class TestTestBinding extends AutomatedTestWidgetsFlutterBinding {
+  @override
+  DebugPrintCallback get debugPrintOverride => testPrint;
+  static void testPrint(String? message, {int? wrapWidth}) {
+    print(message);
+  }
+}
+
+Future<void> guardedHelper(WidgetTester tester) {
   return TestAsyncUtils.guard(() async {
-    await tester.pumpWidget(new Text('Hello'));
+    await tester.pumpWidget(const Text('Hello', textDirection: TextDirection.ltr));
   });
 }
 
 void main() {
+  TestTestBinding();
   testWidgets('TestAsyncUtils - custom guarded sections', (WidgetTester tester) async {
-    debugPrint = (String message, { int wrapWidth }) { print(message); };
-    await tester.pumpWidget(new Container());
+    await tester.pumpWidget(Container());
     expect(find.byElementType(Container), isNotNull);
-    guardedHelper(tester);
+    guardedHelper(tester); // ignore: unawaited_futures
     expect(find.byElementType(Container), isNull);
     // this should fail
   });

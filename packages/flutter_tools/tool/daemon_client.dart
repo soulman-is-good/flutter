@@ -1,4 +1,4 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-Process daemon;
+late Process daemon;
 
 // To use, start from the console and enter:
 //   version: print version
@@ -14,20 +14,24 @@ Process daemon;
 //   start: start an app
 //   stop: stop a running app
 //   devices: list devices
+//   emulators: list emulators
+//   emulator-launch: launch an emulator, append the word coldBoot to cold boot the emulator.
 
-Future<Null> main() async {
+Future<void> main() async {
   daemon = await Process.start('dart', <String>['bin/flutter_tools.dart', 'daemon']);
   print('daemon process started, pid: ${daemon.pid}');
 
   daemon.stdout
-    .transform(UTF8.decoder)
-    .transform(const LineSplitter())
-    .listen((String line) => print('<== $line'));
-  daemon.stderr.listen((dynamic data) => stderr.add(data));
+      .transform<String>(utf8.decoder)
+      .transform<String>(const LineSplitter())
+      .listen((String line) => print('<== $line'));
+  daemon.stderr.listen(stderr.add);
 
   stdout.write('> ');
-  stdin.transform(UTF8.decoder).transform(const LineSplitter()).listen((String line) {
-    List<String> words = line.split(' ');
+  stdin.transform<String>(utf8.decoder).transform<String>(const LineSplitter()).listen((
+    String line,
+  ) {
+    final List<String> words = line.split(' ');
 
     if (line == 'version' || line == 'v') {
       _send(<String, dynamic>{'method': 'daemon.version'});
@@ -36,16 +40,17 @@ Future<Null> main() async {
     } else if (words.first == 'start') {
       _send(<String, dynamic>{
         'method': 'app.start',
-        'params': <String, dynamic> {
+        'params': <String, dynamic>{
           'deviceId': words[1],
-          'projectDirectory': words[2]
-        }
+          'projectDirectory': words[2],
+          'launchMode': words[3],
+        },
       });
     } else if (words.first == 'stop') {
       if (words.length > 1) {
         _send(<String, dynamic>{
           'method': 'app.stop',
-          'params': <String, dynamic> { 'appId': words[1] }
+          'params': <String, dynamic>{'appId': words[1]},
         });
       } else {
         _send(<String, dynamic>{'method': 'app.stop'});
@@ -54,13 +59,23 @@ Future<Null> main() async {
       if (words.length > 1) {
         _send(<String, dynamic>{
           'method': 'app.restart',
-          'params': <String, dynamic> { 'appId': words[1] }
+          'params': <String, dynamic>{'appId': words[1]},
         });
       } else {
         _send(<String, dynamic>{'method': 'app.restart'});
       }
     } else if (line == 'devices') {
       _send(<String, dynamic>{'method': 'device.getDevices'});
+    } else if (line == 'emulators') {
+      _send(<String, dynamic>{'method': 'emulator.getEmulators'});
+    } else if (words.first == 'emulator-launch') {
+      _send(<String, dynamic>{
+        'method': 'emulator.launch',
+        'params': <String, dynamic>{
+          'emulatorId': words[1],
+          if (words.contains('coldBoot')) 'coldBoot': true,
+        },
+      });
     } else if (line == 'enable') {
       _send(<String, dynamic>{'method': 'device.enable'});
     } else {
@@ -69,17 +84,20 @@ Future<Null> main() async {
     stdout.write('> ');
   });
 
-  daemon.exitCode.then((int code) {
-    print('daemon exiting ($code)');
-    exit(code);
-  });
+  // Print in the callback can't fail.
+  unawaited(
+    daemon.exitCode.then<int>((int code) {
+      print('daemon exiting ($code)');
+      exit(code);
+    }),
+  );
 }
 
 int id = 0;
 
 void _send(Map<String, dynamic> map) {
   map['id'] = id++;
-  String str = '[${JSON.encode(map)}]';
+  final str = '[${json.encode(map)}]';
   daemon.stdin.writeln(str);
   print('==> $str');
 }

@@ -1,227 +1,244 @@
+<!-- when editing this file also update https://github.com/flutter/.github/blob/main/CONTRIBUTING.md -->
+
 Contributing to Flutter
 =======================
 
-[![Build Status](https://travis-ci.org/flutter/flutter.svg)](https://travis-ci.org/flutter/flutter)
+_tl;dr: join [Discord](./docs/contributing/Chat.md), be [courteous](CODE_OF_CONDUCT.md), follow the steps below to set up a development environment; if you stick around and contribute, you can [join the team](./docs/contributing/Contributor-access.md) and get commit access._
 
-Things you will need
---------------------
+Welcome
+-------
 
- * Linux or Mac OS X. (Windows is not yet supported.)
- * git (used for source version control).
- * An IDE. We recommend [Atom](http://dart-atom.github.io/dartlang/).
- * An ssh client (used to authenticate with GitHub).
- * Python (used by some of our tools).
- * The Android platform tools (see [Issue #55](https://github.com/flutter/flutter/issues/55)
-   about downloading the Android platform tools automatically).
-   _If you're also working on the Flutter engine, you can use the
-   copy of the Android platform tools in
-   `.../engine/src/third_party/android_tools/sdk/platform-tools`._
-   - Mac: `brew install android-platform-tools`
-   - Linux: `sudo apt-get install android-tools-adb`
+We invite you to join the Flutter team, which is made up of volunteers and sponsored folk alike!
+There are many ways to contribute, including writing code, filing issues on GitHub, helping people
+on our mailing lists, our chat channels, or on Stack Overflow, helping to triage, reproduce, or
+fix bugs that people have filed, adding to our documentation,
+doing outreach about Flutter, or helping out in any other way.
 
-Getting the code and configuring your environment
--------------------------------------------------
+We grant commit access (which includes full rights to the issue
+database, such as being able to edit labels) to people who have gained
+our trust and demonstrated a commitment to Flutter. For more details
+see the [Contributor access](./docs/contributing/Contributor-access.md)
+page in our docs.
 
- * Ensure all the dependencies described in the previous section, in particular
-   git, ssh, and python are installed. Ensure that `adb`
-   (from the Android platform tools) is in your path (e.g.,
-   that `which adb` prints sensible output).
- * Fork `https://github.com/flutter/flutter` into your own GitHub account. If
-   you already have a fork, and are now installing a development environment on
-   a new machine, make sure you've updated your fork so that you don't use stale
-   configuration options from long ago.
- * If you haven't configured your machine with an SSH key that's known to github then
-   follow the directions here: https://help.github.com/articles/generating-ssh-keys/.
- * `git clone git@github.com:<your_name_here>/flutter.git`
- * `cd flutter`
- * `git remote add upstream git@github.com:flutter/flutter.git` (So that you
-   fetch from the master repository, not your clone, when running `git fetch`
-   et al.)
- * Add this repository's `bin` directory to your path. That will let you use the
-   `flutter` command in this directory more easily.
- * Run `flutter update-packages` This will fetch all the Dart packages that
-   Flutter depends on. You can replicate what this script does by running
-   `pub get` in each directory that contains a `pubspec.yaml` file.
+We communicate primarily over GitHub and [Discord](./docs/contributing/Chat.md).
 
-Running the examples
---------------------
+Before you get started, we encourage you to read these documents which describe some of our community norms:
 
-To run an example with a prebuilt binary from the cloud, switch to that
-example's directory, run `pub get` to make sure its dependencies have been
-downloaded, and use `flutter run`. Make sure you have a device connected over
-USB and debugging enabled on that device.
+1. [Our code of conduct](CODE_OF_CONDUCT.md), which stipulates explicitly
+   that everyone must be gracious, respectful, and professional. This
+   also documents our conflict resolution policy and encourages people
+   to ask questions.
 
- * `cd examples/hello_world`
- * `flutter run`
+2. [Values](./docs/about/Values.md),
+   which talks about what we care most about.
 
-You can also specify a particular Dart file to run if you want to run an example
-that doesn't have a `lib/main.dart` file using the `-t` command-line option. For
-example, to run the `widgets/spinning_square.dart` example in the [examples/layers](examples/layers)
-directory on a connected Android device, from that directory you would run:
-`flutter run -t widgets/spinning_square.dart`
+Helping out in the issue database
+---------------------------------
 
-When running code from the examples directory, any changes you make to the
-example code, as well as any changes to Dart code in the
-[packages/flutter](packages/flutter) directory and subdirectories, will
-automatically be picked when you relaunch the app.  You can do the same for your
-own code by mimicking the `pubspec.yaml` files in the `examples` subdirectories.
+Triage is the process of going through bug reports and determining if they are valid, finding out
+how to reproduce them, catching duplicate reports, and generally making our issues list
+useful for our engineers.
 
-Running the tests
+If you want to help us triage, you are very welcome to do so!
+
+1. Join the #hackers-triage [Discord channel](./docs/contributing/Chat.md).
+
+2. Read [our code of conduct](CODE_OF_CONDUCT.md), which stipulates explicitly
+   that everyone must be gracious, respectful, and professional. If you're helping out
+   with triage, you are representing the Flutter team, and so you want to make sure to
+   make a good impression!
+
+3. Help out as described in our [triage guide](./docs/triage/README.md)
+   You won't be able to add labels at first, so instead start by trying to
+   do the other steps, e.g. trying to reproduce the problem and asking for people to
+   provide enough details that you can reproduce the problem, pointing out duplicates,
+   and so on. Chat on the #hackers-triage channel to let us know what you're up to!
+
+   * **Do not** run an unsupervised agent that posts triage comments to the issue database.
+     Any automated agent needs to be approved in advance, after discussion with the
+     Flutter team.
+
+4. Familiarize yourself with our
+   [issue hygiene](./docs/contributing/issue_hygiene/README.md) wiki page,
+   which covers the meanings of some important GitHub labels and
+   milestones.
+
+5. Once you've been doing this for a while, someone will invite you to the flutter-hackers
+   team on GitHub and you'll be able to add labels too. See the
+   [contributor access](./docs/contributing/Contributor-access.md) wiki
+   page for details.
+
+
+Quality Assurance
 -----------------
 
-To automatically find all files named `_test.dart` inside a package's `test/` subdirectory, and run them inside the flutter shell as a test, use the `flutter test` command, e.g:
+One of the most useful tasks, closely related to triage, is finding and filing bug reports. Testing
+beta releases, looking for regressions, creating test cases, adding to our test suites, and
+other work along these lines can really drive the quality of the product up. Creating tests
+that increase our test coverage, writing tests for issues others have filed, all these tasks
+are really valuable contributions to open source projects.
 
- * `cd examples/stocks`
- * `flutter test`
+If this interests you, you can jump in and submit bug reports without needing anyone's permission!
+The #quality-assurance channel on our [Discord server](./docs/contributing/Chat.md)
+is a good place to talk about what you're doing. We're especially eager for QA testing when
+we announce a beta release. See [quality assurance](./docs/releases/Quality-Assurance.md) for
+more details.
 
-Individual tests can also be run directly, e.g. `flutter test lib/my_app_test.dart`
+If you want to contribute test cases, you can also submit PRs. See the next section
+for how to set up your development environment, or ask in #hackers-test on Discord.
 
-Flutter tests use [package:flutter_test](https://github.com/flutter/flutter/tree/master/packages/flutter_test) which provides flutter-specific extensions on top of [package:test](https://pub.dartlang.org/packages/test).
+> As a personal side note, this is exactly the kind of work that first got me into open
+> source. I was a Quality Assurance volunteer on the Mozilla project, writing test cases for
+> browsers, long before I wrote a line of code for any open source project. —Hixie
 
-`flutter test` runs tests inside the flutter shell.  Some packages inside the flutter repository can be run inside the dart command line VM as well as the flutter shell, `packages/flutter_tools` is one such example:
 
- * `cd packages/flutter_tools`
- * `dart test/all.dart`
+Developing for Flutter
+----------------------
 
-To run all the tests for the entire Flutter repository, the same way that Travis runs them, run `dev/bots/test.sh`.
+If you prefer to write code, consider starting with the list of good
+first issues for [Flutter][flutter-gfi] or for [Flutter DevTools][devtools-gfi].
+Reference the respective sections below for further instructions.
 
-If you've built [your own flutter engine](#working-on-the-engine-and-the-framework-at-the-same-time), you can pass `--local-engine` to change what flutter shell `flutter test` uses. For example,
-if you built an engine in the `out/host_debug_unopt` directory, you can pass
-`--local-engine=host_debug_unopt` to run the tests in that engine.
+[flutter-gfi]: https://github.com/flutter/flutter/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22
+[devtools-gfi]: https://github.com/flutter/devtools/labels/good%20first%20issue
 
-Note: Flutter tests are headless, you won't see any UI. You can use
-`print` to generate console output or you can interact with the DartVM
-via observatory at [http://localhost:8181/](http://localhost:8181/).
+### Framework and Engine
 
-Adding a test
--------------
+To develop for Flutter, you will eventually need to become familiar
+with our processes and conventions. This section lists the documents
+that describe these methodologies. The following list is ordered: you
+are strongly recommended to go through these documents in the order
+presented.
 
-To add a test to the Flutter package, simply create a file whose name
-ends with `_test.dart` in the `packages/flutter/test` directory. The
-test should have a `main` function and use the `test` package.
+1. [Setting up your engine development environment](./docs/engine/contributing/Setting-up-the-Engine-development-environment.md),
+   which describes the steps you need to configure your computer to
+   work on Flutter's engine. If you only want to write code for the
+   Flutter framework, you can skip this step. Flutter's engine mainly
+   uses C++, Java, and Objective-C.
 
-Contributing code
+2. [Setting up your framework development environment](./docs/contributing/Setting-up-the-Framework-development-environment.md),
+   which describes the steps you need to configure your computer to
+   work on Flutter's framework. Flutter's framework mainly uses Dart.
+
+3. [Tree hygiene](./docs/contributing/Tree-hygiene.md),
+   which covers how to land a PR, how to do code review, how to
+   handle breaking changes, how to handle regressions, and how to
+   handle post-commit test failures.
+
+4. [Our style guide](./docs/contributing/Style-guide-for-Flutter-repo.md),
+   which includes advice for designing APIs for Flutter, and how to
+   format code in the framework.
+
+5. [Flutter design doc template](https://flutter.dev/go/template),
+   which should be used when proposing a new technical design.  This is a good
+   practice to do before coding more intricate changes.
+   See also our [guidance for writing design docs](./docs/contributing/Design-Documents.md).
+
+[![How to contribute to Flutter](https://img.youtube.com/vi/4yBgOBAOx_A/0.jpg)](https://www.youtube.com/watch?v=4yBgOBAOx_A)
+
+In addition to the documents, there is a video linked above on **How to contribute to Flutter**
+from the [Flutter](https://youtube.com/c/flutterdev) YouTube channel,
+there are many pages in [our docs](./docs/README.md),
+and an article [Contributing to Flutter: Getting Started](https://medium.com/@ayushbherwani/contributing-to-flutter-getting-started-a0db68cbcd5b)
+on Medium that may be of interest. For a curated list of pages see the sidebar
+on the wiki's home page. They are more or less listed in order of importance.
+
+### DevTools
+
+Contributing code to Dart & Flutter DevTools may be a good place to start if you are
+looking to dip your toes into contributing with a relatively low-cost setup or if you
+are generally excited about improving the Dart & Flutter developer experience.
+
+Please see the DevTools [CONTRIBUTING.md](https://github.com/flutter/devtools/blob/master/CONTRIBUTING.md)
+guide to get started.
+
+### Helping with existing PRs
+
+Once you've learned the process of contributing, if you aren't sure what to work on next you
+might be interested in helping other developers complete their contributions by picking up an
+incomplete patch from the list of [issues with partial patches][has-partial-patch].
+
+[has-partial-patch]: https://github.com/flutter/flutter/labels/has%20partial%20patch
+
+
+Reviewing Code
+--------------
+
+Reviewing code is just as valuable as writing it. It is one of the fastest ways
+to learn the codebase and help the team move faster. We welcome reviews from
+everyone, regardless of whether you have commit access.
+
+### The Reviewer Path
+
+Anyone can provide review feedback on a change, and doing so is an excellent way
+to learn the codebase.
+
+While reviews are welcome from the entire community, currently only members of
+the `flutter-hackers` group can grant the final approval required for a change
+to land. Consistently providing helpful code reviews is a valid and highly
+encouraged path to joining this group.
+
+For more information on how to earn commit access, please read the
+[Contributor access guide](./docs/contributing/Contributor-access.md).
+
+### How to Review
+
+If you are new to reviewing, start by:
+
+1. **[Reading the Tree Hygiene guide.](./docs/contributing/Tree-hygiene.md#how)** It contains a 10-point checklist of what we look for (CLA, tests, API design, etc.).
+2. **Leaving comments.** Even if you can't "Approve" a PR yet, pointing out a missing test or a style violation helps the author and saves the maintainers time.
+3. **Being Gracious.** Follow our mantra: Be polite, explain the why, and provide clear next steps.
+
+Outreach
+--------
+
+If your interests lie in the direction of developer relations and developer outreach,
+whether advocating for Flutter, answering questions in fora like
+[Stack Overflow](https://stackoverflow.com/questions/tagged/flutter?sort=Newest&filters=NoAnswers,NoAcceptedAnswer&edited=true)
+or [Reddit](https://www.reddit.com/r/flutterhelp/new/?f=flair_name%3A%22OPEN%22),
+or creating content for our [documentation](https://docs.flutter.dev/)
+or sites like [YouTube](https://www.youtube.com/results?search_query=flutter&sp=EgQIAxAB),
+the best starting point is to join the #hackers-devrel [Discord channel](./docs/contributing/Chat.md).
+From there, you can describe what you're interested in doing, and go ahead and do it!
+As others become familiar with your work, they may have feedback, be interested in
+collaborating, or want to coordinate their efforts with yours.
+
+
+API documentation
 -----------------
 
-We gladly accept contributions via GitHub pull requests.
+Another great area to contribute in is sample code and API documentation. If this is an area that interests you, join our
+[Discord](./docs/contributing/Chat.md) server and introduce yourself on the #hackers-devrel, #hackers-framework,
+or #hackers-engine channels, describing your area of interest. As our API docs are integrated into our source code, see the
+"developing for Flutter" section above for a guide on how to set up your developer environment.
 
-To start working on a patch:
+To contribute API documentation, an excellent command of the English language is particularly helpful, as is a careful attention to detail.
+We have a [whole section in our style guide](./docs/contributing/Style-guide-for-Flutter-repo.md#documentation-dartdocs-javadocs-etc)
+that you should read before you write API documentation. It includes notes on the "Flutter Voice", such as our word and grammar conventions.
 
- * `git fetch upstream`
- * `git checkout upstream/master -b name_of_your_branch`
- * Hack away. Please peruse our
- [style guides](https://flutter.io/style-guide/) and
- [design principles](https://flutter.io/design-principles/) before
- working on anything non-trivial. These guidelines are intended to
- keep the code consistent and avoid common pitfalls.
- * `git commit -a -m "<your informative commit message>"`
- * `git push origin name_of_your_branch`
+In general, a really productive way to improve documentation is to use Flutter and stop any time you have a question: find the answer, then
+document the answer where you first looked for it.
 
-To send us a pull request:
+We also keep [a list of areas that need better API documentation](https://github.com/flutter/flutter/issues?q=is%3Aopen+is%3Aissue+label%3A%22d%3A+api+docs%22+sort%3Areactions-%2B1-desc).
+In many cases, we have written down what needs to be said in the relevant issue, we just haven't gotten around to doing it!
 
-* `git pull-request` (if you are using [Hub](http://github.com/github/hub/)) or
-  go to `https://github.com/flutter/flutter` and click the
-  "Compare & pull request" button
+We're especially eager to add sample code and diagrams to our API documentation. Diagrams are generated from Flutter code that
+draws to a canvas, and stored in a [special repository](https://github.com/flutter/assets-for-api-docs/#readme). It can be a lot of fun
+to create new diagrams for the API docs.
 
-Please make sure all your checkins have detailed commit messages explaining the patch.
-If you made multiple commits for a single pull request, either make sure each one has a detailed
-message explaining that specific commit, or squash your commits into one single checkin with a
-detailed message before sending the pull request.
 
-Once you've gotten an LGTM from a project maintainer, submit your changes to the
-`master` branch using one of the following methods:
+Releases
+--------
 
-* Wait for one of the project maintainers to submit it for you.
-* Click the green "Merge pull request" button on the GitHub UI of your pull
-  request (requires commit access)
-* `git push upstream name_of_your_branch:master` (requires commit access)
+If you are interested in participating in our release process, which may involve writing release notes and blog posts, coordinating the actual
+generation of binaries, updating our release tooling, and other work of that nature, then reach out on the #hackers-releases
+channel of our [Discord](./docs/contributing/Chat.md) server.
 
-You must complete the
-[Contributor License Agreement](https://cla.developers.google.com/clas).
-You can do this online, and it only takes a minute.
-If you've never submitted code before, you must add your (or your
-organization's) name and contact info to the [AUTHORS](AUTHORS) file.
 
-Tools for tracking an improving test coverage
----------------------------------------------
+Social events in the contributor community
+------------------------------------------
 
-We strive for a high degree of test coverage for the Flutter framework. We use
-Coveralls to [track our test coverage](https://coveralls.io/github/flutter/flutter?branch=master).
-You can download our current coverage data from cloud storage and visualize it
-in Atom as follows:
-
- * Install the [lcov-info](https://atom.io/packages/lcov-info) package for Atom.
- * Open the `packages/flutter` folder in Atom.
- * Open a Dart file in the `lib` directory an type `Ctrl+Alt+C` to bring up the
-   coverage data.
-
-If you don't see any coverage data, check that you have an `lcov.info` file in
-the `packages/flutter/coverage` directory. It should have been downloaded by the
-`flutter update-packages` command you ran previously.
-
-If you want to iterate quickly on improving test coverage, consider using this
-workflow:
-
- * Open a file and observe that some line is untested.
- * Write a test that exercises that line.
- * Run `flutter test --merge-coverage path/to/your/test_test.dart`.
- * After the test passes, observe that the line is now tested.
-
-This workflow merges the coverage data from this test run with the base coverage
-data downloaded by `flutter update-packages`.
-
-See [issue 4719](https://github.com/flutter/flutter/issues/4719) for ideas about
-how to improve this workflow.
-
-Working on the engine and the framework at the same time
---------------------------------------------------------
-
-You can work both with this repository (flutter.git) and the Flutter
-[engine repository](https://github.com/flutter/engine) at the same time using
-the following steps.
-
-1. Follow the instructions above for creating a working copy of this repository.
-
-2. Follow the [contributing instructions](https://github.com/flutter/engine/blob/master/CONTRIBUTING.md)
-   for the engine repository to create a working copy of the engine. When you
-   create the `.gclient` file for the engine, be sure to create it in a
-   directory named `engine` that is a sibling of the directory in which you
-   cloned this repository. For example, if you cloned this repository into the
-   `/foo/bar/flutter` directory, you should create the `.gclient` file in the
-   `/foo/bar/engine` directory. The actual code from the engine repository will
-   end up in `/foo/bar/engine/src` because `gclient` creates a `src` directory
-   underneath the directory that contains the `.gclient` file.
-
-3. To run tests on your host machine, build one of the host configurations
-   (e.g., `out/host_debug_unopt`). To run examples on Android, build one of the
-   Android configurations (e.g., `out/android_debug_unopt`).
-
-You should now be able to run the tests against your locally built
-engine using the `flutter test --local-engine=host_debug_unopt` command. To run
-one of the examples on your device using your locally built engine, use the
-`--local-engine=android_debug_unopt` option to the `flutter` tool:
-
- * `flutter run --local-engine=android_debug_unopt`
-
-Making a breaking change to the engine
---------------------------------------
-
-If you make a breaking change to the engine, you'll need to land your change in a
-few steps:
-
-1. Land your change in the engine repository.
-
-2. Publish a new version of the engine that contains your change. See the
-   engine's [release process](https://github.com/flutter/engine/wiki/Release-process)
-   for instructions about how to publish a new version of the engine. Publishing
-   a new version is important in order to not break folks using prebuilt
-   binaries in their workflow (e.g., our customers).
-
-3. Land a change that update our dependency on the `sky_engine` and
-   `sky_services` packages to point to the new version of the engine that you
-   just published. These dependencies are defined by [packages/flutter/pubspec.yaml](packages/flutter/pubspec.yaml).
-   After changing the `pubspec.yaml` file, you'll need to run
-   `./dev/update_packages.dart` to update all the packages in this repository to
-   see the new dependency. As part of landing this change, you should make
-   whatever other changes are needed in this repository to account for your
-   breaking change.
+Finally, one area where you could have a lot of impact is in contributing to social interactions among the Flutter contributor community itself.
+This could take the form of organizing weekly video chats on our Discord, or planning tech talks from contributors, for example.
+If this is an area that is of interest to you, please join our [Discord](./docs/contributing/Chat.md) and ping Hixie on the #hackers
+channel!

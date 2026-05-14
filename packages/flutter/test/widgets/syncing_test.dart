@@ -1,91 +1,93 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 class TestWidget extends StatefulWidget {
-  TestWidget({ this.child, this.persistentState, this.syncedState });
+  const TestWidget({
+    super.key,
+    required this.child,
+    required this.persistentState,
+    required this.syncedState,
+  });
 
   final Widget child;
   final int persistentState;
   final int syncedState;
 
   @override
-  TestWidgetState createState() => new TestWidgetState();
+  TestWidgetState createState() => TestWidgetState();
 }
 
 class TestWidgetState extends State<TestWidget> {
-  int persistentState;
-  int syncedState;
+  late int persistentState;
+  late int syncedState;
   int updates = 0;
 
   @override
   void initState() {
     super.initState();
-    persistentState = config.persistentState;
-    syncedState = config.syncedState;
+    persistentState = widget.persistentState;
+    syncedState = widget.syncedState;
   }
 
   @override
-  void didUpdateConfig(TestWidget oldConfig) {
-    syncedState = config.syncedState;
+  void didUpdateWidget(TestWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    syncedState = widget.syncedState;
     // we explicitly do NOT sync the persistentState from the new instance
     // because we're using that to track whether we got recreated
     updates += 1;
   }
 
   @override
-  Widget build(BuildContext context) => config.child;
+  Widget build(BuildContext context) => widget.child;
 }
 
 void main() {
-
   testWidgets('no change', (WidgetTester tester) async {
     await tester.pumpWidget(
-      new Container(
-        child: new Container(
-          child: new TestWidget(
-            persistentState: 1,
-            child: new Container()
-          )
-        )
-      )
+      ColoredBox(
+        color: const Color(0xFF0000FF),
+        child: ColoredBox(
+          color: const Color(0xFF0000FF),
+          child: TestWidget(persistentState: 1, syncedState: 0, child: Container()),
+        ),
+      ),
     );
 
-    TestWidgetState state = tester.state(find.byType(TestWidget));
+    final TestWidgetState state = tester.state(find.byType(TestWidget));
 
     expect(state.persistentState, equals(1));
     expect(state.updates, equals(0));
 
     await tester.pumpWidget(
-      new Container(
-        child: new Container(
-          child: new TestWidget(
-            persistentState: 2,
-            child: new Container()
-          )
-        )
-      )
+      ColoredBox(
+        color: const Color(0xFF0000FF),
+        child: ColoredBox(
+          color: const Color(0xFF0000FF),
+          child: TestWidget(persistentState: 2, syncedState: 0, child: Container()),
+        ),
+      ),
     );
 
     expect(state.persistentState, equals(1));
     expect(state.updates, equals(1));
 
-    await tester.pumpWidget(new Container());
+    await tester.pumpWidget(Container());
   });
 
   testWidgets('remove one', (WidgetTester tester) async {
     await tester.pumpWidget(
-      new Container(
-        child: new Container(
-          child: new TestWidget(
-            persistentState: 10,
-            child: new Container()
-          )
-        )
-      )
+      ColoredBox(
+        color: const Color(0xFF0000FF),
+        child: ColoredBox(
+          color: const Color(0xFF0000FF),
+          child: TestWidget(persistentState: 10, syncedState: 0, child: Container()),
+        ),
+      ),
     );
 
     TestWidgetState state = tester.state(find.byType(TestWidget));
@@ -94,12 +96,10 @@ void main() {
     expect(state.updates, equals(0));
 
     await tester.pumpWidget(
-      new Container(
-        child: new TestWidget(
-          persistentState: 11,
-          child: new Container()
-        )
-      )
+      ColoredBox(
+        color: const Color(0xFF00FF00),
+        child: TestWidget(persistentState: 11, syncedState: 0, child: Container()),
+      ),
     );
 
     state = tester.state(find.byType(TestWidget));
@@ -107,67 +107,63 @@ void main() {
     expect(state.persistentState, equals(11));
     expect(state.updates, equals(0));
 
-    await tester.pumpWidget(new Container());
+    await tester.pumpWidget(Container());
   });
 
   testWidgets('swap instances around', (WidgetTester tester) async {
-    Widget a = new TestWidget(persistentState: 0x61, syncedState: 0x41, child: new Text('apple'));
-    Widget b = new TestWidget(persistentState: 0x62, syncedState: 0x42, child: new Text('banana'));
-    await tester.pumpWidget(new Column());
+    const Widget a = TestWidget(
+      persistentState: 0x61,
+      syncedState: 0x41,
+      child: Text('apple', textDirection: TextDirection.ltr),
+    );
+    const Widget b = TestWidget(
+      persistentState: 0x62,
+      syncedState: 0x42,
+      child: Text('banana', textDirection: TextDirection.ltr),
+    );
+    await tester.pumpWidget(const Column());
 
-    GlobalKey keyA = new GlobalKey();
-    GlobalKey keyB = new GlobalKey();
+    final GlobalKey keyA = GlobalKey();
+    final GlobalKey keyB = GlobalKey();
 
     await tester.pumpWidget(
-      new Column(
+      Column(
         children: <Widget>[
-          new Container(
-            key: keyA,
-            child: a
-          ),
-          new Container(
-            key: keyB,
-            child: b
-          )
-        ]
-      )
+          Container(key: keyA, child: a),
+          Container(key: keyB, child: b),
+        ],
+      ),
     );
 
     TestWidgetState first, second;
 
-    first = tester.state(find.byConfig(a));
-    second = tester.state(find.byConfig(b));
+    first = tester.state(find.byWidget(a));
+    second = tester.state(find.byWidget(b));
 
-    expect(first.config, equals(a));
+    expect(first.widget, equals(a));
     expect(first.persistentState, equals(0x61));
     expect(first.syncedState, equals(0x41));
-    expect(second.config, equals(b));
+    expect(second.widget, equals(b));
     expect(second.persistentState, equals(0x62));
     expect(second.syncedState, equals(0x42));
 
     await tester.pumpWidget(
-      new Column(
+      Column(
         children: <Widget>[
-          new Container(
-            key: keyA,
-            child: a
-          ),
-          new Container(
-            key: keyB,
-            child: b
-          )
-        ]
-      )
+          Container(key: keyA, child: a),
+          Container(key: keyB, child: b),
+        ],
+      ),
     );
 
-    first = tester.state(find.byConfig(a));
-    second = tester.state(find.byConfig(b));
+    first = tester.state(find.byWidget(a));
+    second = tester.state(find.byWidget(b));
 
     // same as before
-    expect(first.config, equals(a));
+    expect(first.widget, equals(a));
     expect(first.persistentState, equals(0x61));
     expect(first.syncedState, equals(0x41));
-    expect(second.config, equals(b));
+    expect(second.widget, equals(b));
     expect(second.persistentState, equals(0x62));
     expect(second.syncedState, equals(0x42));
 
@@ -175,27 +171,21 @@ void main() {
     // since they are both "old" nodes, they shouldn't sync with each other even though they look alike
 
     await tester.pumpWidget(
-      new Column(
+      Column(
         children: <Widget>[
-          new Container(
-            key: keyA,
-            child: b
-          ),
-          new Container(
-            key: keyB,
-            child: a
-          )
-        ]
-      )
+          Container(key: keyA, child: b),
+          Container(key: keyB, child: a),
+        ],
+      ),
     );
 
-    first = tester.state(find.byConfig(b));
-    second = tester.state(find.byConfig(a));
+    first = tester.state(find.byWidget(b));
+    second = tester.state(find.byWidget(a));
 
-    expect(first.config, equals(b));
+    expect(first.widget, equals(b));
     expect(first.persistentState, equals(0x61));
     expect(first.syncedState, equals(0x42));
-    expect(second.config, equals(a));
+    expect(second.widget, equals(a));
     expect(second.persistentState, equals(0x62));
     expect(second.syncedState, equals(0x41));
   });

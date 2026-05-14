@@ -1,33 +1,36 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter_test/flutter_test.dart' hide TypeMatcher;
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'widgets_app_tester.dart';
 
 class TestTransition extends AnimatedWidget {
-  TestTransition({
-    Key key,
-    this.childFirstHalf,
-    this.childSecondHalf,
-    Animation<double> animation
-  }) : super(key: key, animation: animation);
+  const TestTransition({
+    super.key,
+    required this.childFirstHalf,
+    required this.childSecondHalf,
+    required Animation<double> animation,
+  }) : super(listenable: animation);
 
   final Widget childFirstHalf;
   final Widget childSecondHalf;
 
   @override
   Widget build(BuildContext context) {
-    final Animation<double> animation = this.animation;
-    if (animation.value >= 0.5)
+    final animation = listenable as Animation<double>;
+    if (animation.value >= 0.5) {
       return childSecondHalf;
+    }
     return childFirstHalf;
   }
 }
 
 class TestRoute<T> extends PageRoute<T> {
-  TestRoute({ this.child, RouteSettings settings }) : super(settings: settings);
+  TestRoute({required this.child, required RouteSettings settings, this.barrierColor})
+    : super(settings: settings);
 
   final Widget child;
 
@@ -35,81 +38,105 @@ class TestRoute<T> extends PageRoute<T> {
   Duration get transitionDuration => const Duration(milliseconds: 150);
 
   @override
-  Color get barrierColor => null;
+  final Color? barrierColor;
+
+  @override
+  String? get barrierLabel => null;
 
   @override
   bool get maintainState => false;
 
   @override
-  Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> forwardAnimation) {
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
     return child;
   }
 }
 
 void main() {
-  final Duration kTwoTenthsOfTheTransitionDuration = const Duration(milliseconds: 30);
-  final Duration kFourTenthsOfTheTransitionDuration = const Duration(milliseconds: 60);
+  const kTwoTenthsOfTheTransitionDuration = Duration(milliseconds: 30);
+  const kFourTenthsOfTheTransitionDuration = Duration(milliseconds: 60);
 
   testWidgets('Check onstage/offstage handling around transitions', (WidgetTester tester) async {
+    final GlobalKey insideKey = GlobalKey();
+    final heroController = HeroController();
+    addTearDown(heroController.dispose);
 
-    GlobalKey insideKey = new GlobalKey();
-
-    String state({ bool skipOffstage: true }) {
-      String result = '';
-      if (tester.any(find.text('A', skipOffstage: skipOffstage)))
+    String state({bool skipOffstage = true}) {
+      var result = '';
+      if (tester.any(find.text('A', skipOffstage: skipOffstage))) {
         result += 'A';
-      if (tester.any(find.text('B', skipOffstage: skipOffstage)))
+      }
+      if (tester.any(find.text('B', skipOffstage: skipOffstage))) {
         result += 'B';
-      if (tester.any(find.text('C', skipOffstage: skipOffstage)))
+      }
+      if (tester.any(find.text('C', skipOffstage: skipOffstage))) {
         result += 'C';
-      if (tester.any(find.text('D', skipOffstage: skipOffstage)))
+      }
+      if (tester.any(find.text('D', skipOffstage: skipOffstage))) {
         result += 'D';
-      if (tester.any(find.text('E', skipOffstage: skipOffstage)))
+      }
+      if (tester.any(find.text('E', skipOffstage: skipOffstage))) {
         result += 'E';
-      if (tester.any(find.text('F', skipOffstage: skipOffstage)))
+      }
+      if (tester.any(find.text('F', skipOffstage: skipOffstage))) {
         result += 'F';
-      if (tester.any(find.text('G', skipOffstage: skipOffstage)))
+      }
+      if (tester.any(find.text('G', skipOffstage: skipOffstage))) {
         result += 'G';
+      }
       return result;
     }
 
     await tester.pumpWidget(
-      new MaterialApp(
+      TestWidgetsApp(
+        initialRoute: '/',
+        builder: (BuildContext context, Widget? child) {
+          return HeroControllerScope(controller: heroController, child: child!);
+        },
         onGenerateRoute: (RouteSettings settings) {
           switch (settings.name) {
             case '/':
-              return new TestRoute<Null>(
+              return TestRoute<void>(
                 settings: settings,
-                child: new Builder(
+                child: Builder(
                   key: insideKey,
                   builder: (BuildContext context) {
-                    PageRoute<Null> route = ModalRoute.of(context);
-                    return new Column(
+                    final route = ModalRoute.of(context)! as PageRoute<void>;
+                    return Column(
                       children: <Widget>[
-                        new TestTransition(
-                          childFirstHalf: new Text('A'),
-                          childSecondHalf: new Text('B'),
-                          animation: route.animation
+                        TestTransition(
+                          childFirstHalf: const Text('A'),
+                          childSecondHalf: const Text('B'),
+                          animation: route.animation!,
                         ),
-                        new TestTransition(
-                          childFirstHalf: new Text('C'),
-                          childSecondHalf: new Text('D'),
-                          animation: route.forwardAnimation
+                        TestTransition(
+                          childFirstHalf: const Text('C'),
+                          childSecondHalf: const Text('D'),
+                          animation: route.secondaryAnimation!,
                         ),
-                      ]
+                      ],
                     );
-                  }
-                )
+                  },
+                ),
               );
-            case '/2': return new TestRoute<Null>(settings: settings, child: new Text('E'));
-            case '/3': return new TestRoute<Null>(settings: settings, child: new Text('F'));
-            case '/4': return new TestRoute<Null>(settings: settings, child: new Text('G'));
+            case '/2':
+              return TestRoute<void>(settings: settings, child: const Text('E'));
+            case '/3':
+              return TestRoute<void>(settings: settings, child: const Text('F'));
+            case '/4':
+              return TestRoute<void>(settings: settings, child: const Text('G'));
           }
-        }
-      )
+          return null;
+        },
+      ),
     );
 
-    NavigatorState navigator = insideKey.currentContext.ancestorStateOfType(const TypeMatcher<NavigatorState>());
+    final NavigatorState navigator = insideKey.currentContext!
+        .findAncestorStateOfType<NavigatorState>()!;
 
     expect(state(), equals('BC')); // transition ->1 is at 1.0
 
@@ -127,11 +154,16 @@ void main() {
 
     await tester.pump(kFourTenthsOfTheTransitionDuration);
     expect(state(), equals('E')); // transition 1->2 is at 1.0
-    expect(state(skipOffstage: false), equals('E')); // B and C are gone, the route is inactive with maintainState=false
+    expect(
+      state(skipOffstage: false),
+      equals('E'),
+    ); // B and C are gone, the route is inactive with maintainState=false
 
     navigator.pop();
     expect(state(), equals('E')); // transition 1<-2 is at 1.0, just reversed
     await tester.pump();
+    await tester.pump();
+
     expect(state(), equals('BDE')); // transition 1<-2 is at 1.0
 
     await tester.pump(kFourTenthsOfTheTransitionDuration);
@@ -176,6 +208,42 @@ void main() {
     await tester.pump(kFourTenthsOfTheTransitionDuration);
     expect(state(), equals('G')); // transition 1->4 is done
     expect(state(skipOffstage: false), equals('G')); // route 1 is not around any more
+  });
 
+  testWidgets('Check onstage/offstage handling of barriers around transitions', (
+    WidgetTester tester,
+  ) async {
+    final heroController = HeroController();
+    addTearDown(heroController.dispose);
+    await tester.pumpWidget(
+      TestWidgetsApp(
+        initialRoute: '/',
+        builder: (BuildContext context, Widget? child) {
+          return HeroControllerScope(controller: heroController, child: child!);
+        },
+        onGenerateRoute: (RouteSettings settings) => switch (settings.name) {
+          '/' => TestRoute<void>(settings: settings, child: const Text('A')),
+          '/1' => TestRoute<void>(
+            settings: settings,
+            barrierColor: const Color(0xFFFFFF00),
+            child: const Text('B'),
+          ),
+          _ => null,
+        },
+      ),
+    );
+    expect(find.byType(ModalBarrier), findsOneWidget);
+
+    tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/1');
+    expect(find.byType(ModalBarrier), findsOneWidget);
+
+    await tester.pump();
+    expect(find.byType(ModalBarrier), findsNWidgets(2));
+    expect(tester.widget<ModalBarrier>(find.byType(ModalBarrier).first).color, isNull);
+    expect(tester.widget<ModalBarrier>(find.byType(ModalBarrier).last).color, isNull);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(ModalBarrier), findsOneWidget);
+    expect(tester.widget<ModalBarrier>(find.byType(ModalBarrier)).color, const Color(0xFFFFFF00));
   });
 }

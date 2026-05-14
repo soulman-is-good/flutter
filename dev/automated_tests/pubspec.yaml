@@ -1,12 +1,27 @@
 name: flutter_automated_tests
+
+environment:
+  sdk: ^3.10.0-0
+
+resolution: workspace
+
 dependencies:
-
-  # version 0.13.6+1 does not return the value from the command
-  # causing flutter tools to always have exit code 0
-  # see https://github.com/flutter/flutter/issues/6766
-  args: 0.13.6
-
   flutter:
     sdk: flutter
   flutter_test:
     sdk: flutter
+  flutter_goldens:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  platform: any
+  test: any
+
+  file: any
+
+flutter:
+  uses-material-design: true
+  assets:
+    - icon/test.png
+
+# PUBSPEC CHECKSUM: 1nm9kf

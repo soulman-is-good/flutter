@@ -1,42 +1,63 @@
-import 'dart:io';
+// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:stocks/main.dart' as stocks;
 import 'package:stocks/stock_data.dart' as stock_data;
 
-const Duration kBenchmarkTime = const Duration(seconds: 15);
+import '../common.dart';
 
+const Duration kBenchmarkTime = Duration(seconds: 15);
 
+Future<void> execute() async {
+  assert(false, "Don't run benchmarks in debug mode! Use 'flutter run --release'.");
+  stock_data.StockData.actuallyFetchData = false;
 
-Future<Null> main() async {
-  stock_data.StockDataFetcher.actuallyFetchData = false;
+  // We control the framePolicy below to prevent us from scheduling frames in
+  // the engine, so that the engine does not interfere with our timings.
+  final binding = TestWidgetsFlutterBinding.ensureInitialized() as LiveTestWidgetsFlutterBinding;
 
-  final Stopwatch watch = new Stopwatch();
-  int iterations = 0;
+  final watch = Stopwatch();
+  var iterations = 0;
 
   await benchmarkWidgets((WidgetTester tester) async {
     stocks.main();
     await tester.pump(); // Start startup animation
     await tester.pump(const Duration(seconds: 1)); // Complete startup animation
-    await tester.tapAt(new Point(20.0, 20.0)); // Open drawer
+    await tester.tapAt(const Offset(20.0, 40.0)); // Open drawer
     await tester.pump(); // Start drawer animation
     await tester.pump(const Duration(seconds: 1)); // Complete drawer animation
 
-    final TestViewConfiguration big = new TestViewConfiguration(size: const Size(360.0, 640.0));
-    final TestViewConfiguration small = new TestViewConfiguration(size: const Size(355.0, 635.0));
-    final RenderView renderView = WidgetsBinding.instance.renderView;
+    final big = TestViewConfiguration.fromView(size: const Size(360.0, 640.0), view: tester.view);
+    final small = TestViewConfiguration.fromView(size: const Size(355.0, 635.0), view: tester.view);
+    final RenderView renderView = WidgetsBinding.instance.renderViews.single;
+    binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.benchmark;
 
     watch.start();
     while (watch.elapsed < kBenchmarkTime) {
-      renderView.configuration = (iterations % 2 == 0) ? big : small;
-      RendererBinding.instance.pipelineOwner.flushLayout();
+      renderView.configuration = iterations.isEven ? big : small;
+      await tester.pumpBenchmark(Duration(milliseconds: iterations * 16));
       iterations += 1;
     }
     watch.stop();
   });
 
-  print('Stock layout: ${(watch.elapsedMicroseconds / iterations).toStringAsFixed(1)}µs per iteration');
-  exit(0);
+  final printer = BenchmarkResultPrinter();
+  printer.addResult(
+    description: 'Stock layout',
+    value: watch.elapsedMicroseconds / iterations,
+    unit: 'µs per iteration',
+    name: 'stock_layout_iteration',
+  );
+  printer.printToStdout();
+}
+
+//
+//  Note that the benchmark is normally run by benchmark_collection.dart.
+//
+Future<void> main() async {
+  return execute();
 }

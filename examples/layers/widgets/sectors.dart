@@ -1,43 +1,42 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import '../rendering/src/sector_layout.dart';
 
-RenderBox initCircle() {
-  return new RenderBoxToRenderSectorAdapter(
-    innerRadius: 25.0,
-    child: new RenderSectorRing(padding: 0.0)
-  );
+RenderBoxToRenderSectorAdapter initCircle() {
+  return RenderBoxToRenderSectorAdapter(innerRadius: 25.0, child: RenderSectorRing());
 }
 
 class SectorApp extends StatefulWidget {
+  const SectorApp({super.key});
+
   @override
-  SectorAppState createState() => new SectorAppState();
+  SectorAppState createState() => SectorAppState();
 }
 
 class SectorAppState extends State<SectorApp> {
-
   final RenderBoxToRenderSectorAdapter sectors = initCircle();
-  final math.Random rand = new math.Random(1);
+  final math.Random rand = math.Random(1);
 
   List<double> wantedSectorSizes = <double>[];
   List<double> actualSectorSizes = <double>[];
-  double get currentTheta => wantedSectorSizes.fold(0.0, (double total, double value) => total + value);
+  double get currentTheta =>
+      wantedSectorSizes.fold<double>(0.0, (double total, double value) => total + value);
 
   void addSector() {
     final double currentTheta = this.currentTheta;
     if (currentTheta < kTwoPi) {
       double deltaTheta;
-      if (currentTheta >= kTwoPi - (math.PI * 0.2 + 0.05))
+      if (currentTheta >= kTwoPi - (math.pi * 0.2 + 0.05)) {
         deltaTheta = kTwoPi - currentTheta;
-      else
-        deltaTheta = math.PI * rand.nextDouble() / 5.0 + 0.05;
+      } else {
+        deltaTheta = math.pi * rand.nextDouble() / 5.0 + 0.05;
+      }
       wantedSectorSizes.add(deltaTheta);
       updateEnabledState();
     }
@@ -51,32 +50,33 @@ class SectorAppState extends State<SectorApp> {
   }
 
   void doUpdates() {
-    int index = 0;
-    while (index < actualSectorSizes.length && index < wantedSectorSizes.length && actualSectorSizes[index] == wantedSectorSizes[index])
+    var index = 0;
+    while (index < actualSectorSizes.length &&
+        index < wantedSectorSizes.length &&
+        actualSectorSizes[index] == wantedSectorSizes[index]) {
       index += 1;
-    RenderSectorRing ring = sectors.child;
+    }
+    final ring = sectors.child! as RenderSectorRing;
     while (index < actualSectorSizes.length) {
-      ring.remove(ring.lastChild);
+      ring.remove(ring.lastChild!);
       actualSectorSizes.removeLast();
     }
     while (index < wantedSectorSizes.length) {
-      Color color = new Color(((0xFF << 24) + rand.nextInt(0xFFFFFF)) | 0x808080);
-      ring.add(new RenderSolidColor(color, desiredDeltaTheta: wantedSectorSizes[index]));
+      final color = Color(((0xFF << 24) + rand.nextInt(0xFFFFFF)) | 0x808080);
+      ring.add(RenderSolidColor(color, desiredDeltaTheta: wantedSectorSizes[index]));
       actualSectorSizes.add(wantedSectorSizes[index]);
       index += 1;
     }
   }
 
-  static RenderBox initSector(Color color) {
-    RenderSectorRing ring = new RenderSectorRing(padding: 1.0);
-    ring.add(new RenderSolidColor(const Color(0xFF909090), desiredDeltaTheta: kTwoPi * 0.15));
-    ring.add(new RenderSolidColor(const Color(0xFF909090), desiredDeltaTheta: kTwoPi * 0.15));
-    ring.add(new RenderSolidColor(color, desiredDeltaTheta: kTwoPi * 0.2));
-    return new RenderBoxToRenderSectorAdapter(
-      innerRadius: 5.0,
-      child: ring
-    );
+  static RenderBoxToRenderSectorAdapter initSector(Color color) {
+    final ring = RenderSectorRing(padding: 1.0);
+    ring.add(RenderSolidColor(const Color(0xFF909090), desiredDeltaTheta: kTwoPi * 0.15));
+    ring.add(RenderSolidColor(const Color(0xFF909090), desiredDeltaTheta: kTwoPi * 0.15));
+    ring.add(RenderSolidColor(color, desiredDeltaTheta: kTwoPi * 0.2));
+    return RenderBoxToRenderSectorAdapter(innerRadius: 5.0, child: ring);
   }
+
   RenderBoxToRenderSectorAdapter sectorAddIcon = initSector(const Color(0xFF00DD00));
   RenderBoxToRenderSectorAdapter sectorRemoveIcon = initSector(const Color(0xFFDD0000));
 
@@ -89,80 +89,95 @@ class SectorAppState extends State<SectorApp> {
     });
   }
 
+  void recursivelyDisposeChildren(RenderObject parent) {
+    parent.visitChildren((RenderObject child) {
+      recursivelyDisposeChildren(child);
+      child.dispose();
+    });
+  }
+
   Widget buildBody() {
-    return new Column(
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
-        new Container(
-          padding: new EdgeInsets.symmetric(horizontal: 8.0, vertical: 25.0),
-          child: new Row(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 25.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: <Widget>[
-              new RaisedButton(
+              ElevatedButton(
                 onPressed: _enabledAdd ? addSector : null,
-                child: new IntrinsicWidth(
-                  child: new Row(
+                child: IntrinsicWidth(
+                  child: Row(
                     children: <Widget>[
-                      new Container(
-                        padding: new EdgeInsets.all(4.0),
-                        margin: new EdgeInsets.only(right: 10.0),
-                        child: new WidgetToRenderBoxAdapter(renderBox: sectorAddIcon)
+                      Container(
+                        padding: const EdgeInsets.all(4.0),
+                        margin: const EdgeInsets.only(right: 10.0),
+                        child: WidgetToRenderBoxAdapter(
+                          renderBox: sectorAddIcon,
+                          onUnmount: () {
+                            recursivelyDisposeChildren(sectorAddIcon);
+                          },
+                        ),
                       ),
-                      new Text('ADD SECTOR'),
-                    ]
-                  )
-                )
+                      const Text('ADD SECTOR'),
+                    ],
+                  ),
+                ),
               ),
-              new RaisedButton(
+              ElevatedButton(
                 onPressed: _enabledRemove ? removeSector : null,
-                child: new IntrinsicWidth(
-                  child: new Row(
+                child: IntrinsicWidth(
+                  child: Row(
                     children: <Widget>[
-                      new Container(
-                        padding: new EdgeInsets.all(4.0),
-                        margin: new EdgeInsets.only(right: 10.0),
-                        child: new WidgetToRenderBoxAdapter(renderBox: sectorRemoveIcon)
+                      Container(
+                        padding: const EdgeInsets.all(4.0),
+                        margin: const EdgeInsets.only(right: 10.0),
+                        child: WidgetToRenderBoxAdapter(
+                          renderBox: sectorRemoveIcon,
+                          onUnmount: () {
+                            recursivelyDisposeChildren(sectorRemoveIcon);
+                          },
+                        ),
                       ),
-                      new Text('REMOVE SECTOR'),
-                    ]
-                  )
-                )
+                      const Text('REMOVE SECTOR'),
+                    ],
+                  ),
+                ),
               ),
             ],
-            mainAxisAlignment: MainAxisAlignment.spaceAround
-          )
+          ),
         ),
-        new Flexible(
-          child: new Container(
-            margin: new EdgeInsets.all(8.0),
-            decoration: new BoxDecoration(
-              border: new Border.all()
-            ),
-            padding: new EdgeInsets.all(8.0),
-            child: new WidgetToRenderBoxAdapter(
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(border: Border.all()),
+            padding: const EdgeInsets.all(8.0),
+            child: WidgetToRenderBoxAdapter(
               renderBox: sectors,
-              onBuild: doUpdates
-            )
-          )
+              onBuild: doUpdates,
+              onUnmount: () {
+                recursivelyDisposeChildren(sectors);
+              },
+            ),
+          ),
         ),
       ],
-      mainAxisAlignment: MainAxisAlignment.spaceBetween
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return new MaterialApp(
-      theme: new ThemeData.light(),
+    return MaterialApp(
       title: 'Sector Layout',
-      home: new Scaffold(
-        appBar: new AppBar(
-          title: new Text('Sector Layout in a Widget Tree')
-        ),
-        body: buildBody()
-      )
+      home: Scaffold(
+        appBar: AppBar(title: const Text('Sector Layout in a Widget Tree')),
+        body: buildBody(),
+      ),
     );
   }
 }
 
 void main() {
-  runApp(new SectorApp());
+  runApp(const SectorApp());
 }

@@ -1,17 +1,18 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import 'package:flutter/widgets.dart';
 
 class LifecycleWatcher extends StatefulWidget {
+  const LifecycleWatcher({super.key});
+
   @override
-  _LifecycleWatcherState createState() => new _LifecycleWatcherState();
+  State<LifecycleWatcher> createState() => _LifecycleWatcherState();
 }
 
-class _LifecycleWatcherState extends State<LifecycleWatcher>
-                             with WidgetsBindingObserver {
-  AppLifecycleState _lastLifecyleState;
+class _LifecycleWatcherState extends State<LifecycleWatcher> with WidgetsBindingObserver {
+  AppLifecycleState? _lastLifecycleState;
 
   @override
   void initState() {
@@ -28,21 +29,24 @@ class _LifecycleWatcherState extends State<LifecycleWatcher>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     setState(() {
-      _lastLifecyleState = state;
+      _lastLifecycleState = state;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_lastLifecyleState == null)
-      return new Text('This widget has not observed any lifecycle changes.');
-    return new Text('The most recent lifecycle state this widget observed was: $_lastLifecyleState.');
+    if (_lastLifecycleState == null) {
+      return const Text('This widget has not observed any lifecycle changes.');
+    }
+    return Text('The most recent lifecycle state this widget observed was: $_lastLifecycleState.');
   }
 }
 
-
 void main() {
-  runApp(new Center(
-    child: new LifecycleWatcher()
-  ));
+  runApp(
+    const Directionality(
+      textDirection: TextDirection.ltr,
+      child: Center(child: LifecycleWatcher()),
+    ),
+  );
 }

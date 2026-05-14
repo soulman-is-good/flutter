@@ -1,97 +1,91 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter_test/flutter_test.dart' hide TypeMatcher;
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 class Foo extends StatefulWidget {
+  const Foo({super.key});
   @override
-  FooState createState() => new FooState();
+  FooState createState() => FooState();
 }
 
 class FooState extends State<Foo> {
-  final GlobalKey blockKey = new GlobalKey();
-  GlobalKey<ScrollableState> scrollableKey = new GlobalKey<ScrollableState>();
+  final ScrollController scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return new LayoutBuilder(
+    return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        return new ScrollConfiguration(
-          delegate: new FooScrollConfiguration(),
-          child: new Block(
-            scrollableKey: scrollableKey,
+        return ScrollConfiguration(
+          behavior: const FooScrollBehavior(),
+          child: ListView(
+            controller: scrollController,
             children: <Widget>[
-              new GestureDetector(
+              GestureDetector(
                 onTap: () {
-                  setState(() {});
-                  scrollableKey.currentState.scrollBy(200.0, duration: const Duration(milliseconds: 500));
+                  setState(() {
+                    /* this is needed to trigger the original bug this is regression-testing */
+                  });
+                  scrollController.animateTo(
+                    200.0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.linear,
+                  );
                 },
-                child: new DecoratedBox(
-                  decoration: new BoxDecoration(backgroundColor: const Color(0)),
-                  child: new SizedBox(
-                    height: 200.0,
-                  ),
-                )
-              ),
-              new DecoratedBox(
-                decoration: new BoxDecoration(backgroundColor: const Color(0)),
-                child: new SizedBox(
-                  height: 200.0,
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(color: Color(0x00000000)),
+                  child: SizedBox(height: 200.0),
                 ),
               ),
-              new DecoratedBox(
-                decoration: new BoxDecoration(backgroundColor: const Color(0)),
-                child: new SizedBox(
-                  height: 200.0,
-                ),
+              const DecoratedBox(
+                decoration: BoxDecoration(color: Color(0x00000000)),
+                child: SizedBox(height: 200.0),
               ),
-              new DecoratedBox(
-                decoration: new BoxDecoration(backgroundColor: const Color(0)),
-                child: new SizedBox(
-                  height: 200.0,
-                ),
+              const DecoratedBox(
+                decoration: BoxDecoration(color: Color(0x00000000)),
+                child: SizedBox(height: 200.0),
               ),
-              new DecoratedBox(
-                decoration: new BoxDecoration(backgroundColor: const Color(0)),
-                child: new SizedBox(
-                  height: 200.0,
-                ),
+              const DecoratedBox(
+                decoration: BoxDecoration(color: Color(0x00000000)),
+                child: SizedBox(height: 200.0),
               ),
-              new DecoratedBox(
-                decoration: new BoxDecoration(backgroundColor: const Color(0)),
-                child: new SizedBox(
-                  height: 200.0,
-                ),
+              const DecoratedBox(
+                decoration: BoxDecoration(color: Color(0x00000000)),
+                child: SizedBox(height: 200.0),
+              ),
+              const DecoratedBox(
+                decoration: BoxDecoration(color: Color(0x00000000)),
+                child: SizedBox(height: 200.0),
               ),
             ],
-          )
+          ),
         );
-      }
+      },
     );
   }
 }
 
-class FooScrollConfiguration extends ScrollConfigurationDelegate {
-  @override
-  TargetPlatform get platform => defaultTargetPlatform;
+class FooScrollBehavior extends ScrollBehavior {
+  const FooScrollBehavior();
 
   @override
-  ExtentScrollBehavior createScrollBehavior() =>
-      new OverscrollWhenScrollableBehavior(platform: platform);
-
-  @override
-  bool updateShouldNotify(FooScrollConfiguration old) => true;
+  bool shouldNotify(FooScrollBehavior old) => true;
 }
 
 void main() {
-  testWidgets('https://github.com/flutter/flutter/issues/5630', (WidgetTester tester) async {
-    await tester.pumpWidget(new Foo());
-    expect(tester.state/*<ScrollableState>*/(find.byType(Scrollable)).scrollOffset, 0.0);
+  testWidgets('Can animate scroll after setState', (WidgetTester tester) async {
+    await tester.pumpWidget(const Directionality(textDirection: TextDirection.ltr, child: Foo()));
+    expect(tester.state<ScrollableState>(find.byType(Scrollable)).position.pixels, 0.0);
     await tester.tap(find.byType(GestureDetector).first);
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-    expect(tester.state/*<ScrollableState>*/(find.byType(Scrollable)).scrollOffset, 200.0);
+    await tester.pumpAndSettle();
+    expect(tester.state<ScrollableState>(find.byType(Scrollable)).position.pixels, 200.0);
   });
 }

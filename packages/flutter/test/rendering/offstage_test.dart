@@ -1,30 +1,35 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 import 'rendering_tester.dart';
 
 void main() {
-  test("offstage", () {
+  TestRenderingFlutterBinding.ensureInitialized();
+
+  test('offstage', () {
     RenderBox child;
-    bool painted = false;
-    // viewport incoming constraints are tight 800x600
-    // viewport is vertical by default
-    RenderBox root = new RenderViewport(
-      child: new RenderOffstage(
-        child: new RenderCustomPaint(
-          painter: new TestCallbackPainter(
-            onPaint: () { painted = true; }
+    var painted = false;
+    // incoming constraints are tight 800x600
+    final RenderBox root = RenderPositionedBox(
+      child: RenderConstrainedBox(
+        additionalConstraints: const BoxConstraints.tightFor(width: 800.0),
+        child: RenderOffstage(
+          child: RenderCustomPaint(
+            painter: TestCallbackPainter(
+              onPaint: () {
+                painted = true;
+              },
+            ),
+            child: child = RenderConstrainedBox(
+              additionalConstraints: const BoxConstraints.tightFor(height: 10.0, width: 10.0),
+            ),
           ),
-          child: child = new RenderConstrainedBox(
-            additionalConstraints: new BoxConstraints.tightFor(height: 10.0, width: 10.0)
-          )
-        )
-      )
+        ),
+      ),
     );
     expect(child.hasSize, isFalse);
     expect(painted, isFalse);

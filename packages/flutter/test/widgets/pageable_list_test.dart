@@ -1,72 +1,76 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 
-Size pageSize = new Size(600.0, 300.0);
-const List<int> defaultPages = const <int>[0, 1, 2, 3, 4, 5];
-final List<GlobalKey> globalKeys = defaultPages.map((_) => new GlobalKey()).toList();
-int currentPage;
+Size pageSize = const Size(600.0, 300.0);
+const List<int> defaultPages = <int>[0, 1, 2, 3, 4, 5];
+final List<GlobalKey> globalKeys = defaultPages.map<GlobalKey>((_) => GlobalKey()).toList();
+int? currentPage;
 
 Widget buildPage(int page) {
-  return new Container(
+  return SizedBox(
     key: globalKeys[page],
     width: pageSize.width,
     height: pageSize.height,
-    child: new Text(page.toString())
+    child: Text(page.toString()),
   );
 }
 
 Widget buildFrame({
-  bool itemsWrap: false,
-  ViewportAnchor scrollAnchor: ViewportAnchor.start,
-  List<int> pages: defaultPages
+  bool reverse = false,
+  List<int> pages = defaultPages,
+  required TextDirection textDirection,
 }) {
-  final PageableList list = new PageableList(
-    children: pages.map(buildPage),
-    itemsWrap: itemsWrap,
-    scrollDirection: Axis.horizontal,
-    scrollAnchor: scrollAnchor,
-    onPageChanged: (int page) { currentPage = page; }
+  final child = PageView(
+    reverse: reverse,
+    onPageChanged: (int page) {
+      currentPage = page;
+    },
+    children: pages.map<Widget>(buildPage).toList(),
   );
 
   // The test framework forces the frame to be 800x600, so we need to create
   // an outer container where we can change the size.
-  return new Center(
-    child: new Container(
-      width: pageSize.width, height: pageSize.height, child: list)
+  return Directionality(
+    textDirection: textDirection,
+    child: Center(
+      child: SizedBox(width: pageSize.width, height: pageSize.height, child: child),
+    ),
   );
 }
 
-Future<Null> page(WidgetTester tester, Offset offset) {
+Future<void> page(WidgetTester tester, Offset offset) {
   return TestAsyncUtils.guard(() async {
-    String itemText = currentPage != null ? currentPage.toString() : '0';
-    await tester.scroll(find.text(itemText), offset);
-    // One frame to start the animation, a second to complete it.
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    final itemText = currentPage != null ? currentPage.toString() : '0';
+    await tester.drag(find.text(itemText), offset);
+    await tester.pumpAndSettle();
   });
 }
 
-Future<Null> pageLeft(WidgetTester tester) {
-  return page(tester, new Offset(-pageSize.width, 0.0));
+Future<void> pageLeft(WidgetTester tester) {
+  return page(tester, Offset(-pageSize.width, 0.0));
 }
 
-Future<Null> pageRight(WidgetTester tester) {
-  return page(tester, new Offset(pageSize.width, 0.0));
+Future<void> pageRight(WidgetTester tester) {
+  return page(tester, Offset(pageSize.width, 0.0));
 }
 
 void main() {
-  testWidgets('PageableList default control', (WidgetTester tester) async {
-    await tester.pumpWidget(new Center(child: new PageableList()));
+  testWidgets('PageView default control', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(child: PageView()),
+      ),
+    );
   });
 
-  testWidgets('PageableList with itemsWrap: false', (WidgetTester tester) async {
+  testWidgets('PageView control test (LTR)', (WidgetTester tester) async {
     currentPage = null;
-    await tester.pumpWidget(buildFrame());
+    await tester.pumpWidget(buildFrame(textDirection: TextDirection.ltr));
     expect(currentPage, isNull);
     await pageLeft(tester);
     expect(currentPage, equals(1));
@@ -92,74 +96,18 @@ void main() {
     expect(currentPage, equals(0));
   });
 
-  testWidgets('PageableList with end scroll anchor', (WidgetTester tester) async {
-    currentPage = 5;
-    await tester.pumpWidget(buildFrame(scrollAnchor: ViewportAnchor.end));
-    await pageRight(tester);
-    expect(currentPage, equals(4));
-
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsNothing);
-    expect(find.text('2'), findsNothing);
-    expect(find.text('3'), findsNothing);
-    expect(find.text('4'), findsOneWidget);
-    expect(find.text('5'), findsNothing);
-
-    await pageLeft(tester);
-    expect(currentPage, equals(5));
-
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsNothing);
-    expect(find.text('2'), findsNothing);
-    expect(find.text('3'), findsNothing);
-    expect(find.text('4'), findsNothing);
-    expect(find.text('5'), findsOneWidget);
-
-    await pageLeft(tester);
-    expect(currentPage, equals(5));
-
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsNothing);
-    expect(find.text('2'), findsNothing);
-    expect(find.text('3'), findsNothing);
-    expect(find.text('4'), findsNothing);
-    expect(find.text('5'), findsOneWidget);
-  });
-
-  testWidgets('PageableList with itemsWrap: true', (WidgetTester tester) async {
+  testWidgets('PageView with reverse (LTR)', (WidgetTester tester) async {
     currentPage = null;
-    await tester.pumpWidget(buildFrame(itemsWrap: true));
-    expect(currentPage, isNull);
-    await pageLeft(tester);
+    await tester.pumpWidget(buildFrame(reverse: true, textDirection: TextDirection.ltr));
+    await pageRight(tester);
     expect(currentPage, equals(1));
-    await pageRight(tester);
-    expect(currentPage, equals(0));
-    await pageRight(tester);
-    expect(currentPage, equals(5));
-  });
-
-  testWidgets('PageableList with end and itemsWrap: true', (WidgetTester tester) async {
-    currentPage = 5;
-    await tester.pumpWidget(buildFrame(itemsWrap: true, scrollAnchor: ViewportAnchor.end));
-    await pageRight(tester);
-    expect(currentPage, equals(4));
 
     expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsNothing);
-    expect(find.text('2'), findsNothing);
-    expect(find.text('3'), findsNothing);
-    expect(find.text('4'), findsOneWidget);
-    expect(find.text('5'), findsNothing);
-
-    await pageLeft(tester);
-    expect(currentPage, equals(5));
-
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
     expect(find.text('2'), findsNothing);
     expect(find.text('3'), findsNothing);
     expect(find.text('4'), findsNothing);
-    expect(find.text('5'), findsOneWidget);
+    expect(find.text('5'), findsNothing);
 
     await pageLeft(tester);
     expect(currentPage, equals(0));
@@ -172,6 +120,20 @@ void main() {
     expect(find.text('5'), findsNothing);
 
     await pageLeft(tester);
+    expect(currentPage, equals(0));
+
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+    expect(find.text('2'), findsNothing);
+    expect(find.text('3'), findsNothing);
+    expect(find.text('4'), findsNothing);
+    expect(find.text('5'), findsNothing);
+  });
+
+  testWidgets('PageView control test (RTL)', (WidgetTester tester) async {
+    currentPage = null;
+    await tester.pumpWidget(buildFrame(textDirection: TextDirection.rtl));
+    await pageRight(tester);
     expect(currentPage, equals(1));
 
     expect(find.text('0'), findsNothing);
@@ -180,63 +142,53 @@ void main() {
     expect(find.text('3'), findsNothing);
     expect(find.text('4'), findsNothing);
     expect(find.text('5'), findsNothing);
-  });
 
-  testWidgets('PageableList with two items', (WidgetTester tester) async {
-    currentPage = null;
-    await tester.pumpWidget(buildFrame(itemsWrap: true, pages: <int>[0, 1]));
-    expect(currentPage, isNull);
-    await pageLeft(tester);
-    expect(currentPage, equals(1));
-    await pageRight(tester);
-    expect(currentPage, equals(0));
-    await pageRight(tester);
-    expect(currentPage, equals(1));
-  });
-
-  testWidgets('PageableList with one item', (WidgetTester tester) async {
-    currentPage = null;
-    await tester.pumpWidget(buildFrame(itemsWrap: true, pages: <int>[0]));
-    expect(currentPage, isNull);
     await pageLeft(tester);
     expect(currentPage, equals(0));
-    await pageRight(tester);
-    expect(currentPage, equals(0));
-    await pageRight(tester);
-    expect(currentPage, equals(0));
-  });
 
-  testWidgets('PageableList with no items', (WidgetTester tester) async {
-    currentPage = null;
-    await tester.pumpWidget(buildFrame(itemsWrap: true, pages: <int>[]));
-    expect(currentPage, isNull);
-  });
-
-  testWidgets('PageableList resize parent', (WidgetTester tester) async {
-    await tester.pumpWidget(new Container());
-    currentPage = null;
-
-    await tester.pumpWidget(buildFrame(itemsWrap: true));
-    expect(currentPage, isNull);
-    await pageRight(tester);
-    expect(currentPage, equals(5));
-
-    Size boxSize = globalKeys[5].currentContext.size;
-    expect(boxSize.width, equals(pageSize.width));
-    expect(boxSize.height, equals(pageSize.height));
-
-    pageSize = new Size(pageSize.height, pageSize.width);
-    await tester.pumpWidget(buildFrame(itemsWrap: true));
-
-    expect(find.text('0'), findsNothing);
+    expect(find.text('0'), findsOneWidget);
     expect(find.text('1'), findsNothing);
     expect(find.text('2'), findsNothing);
     expect(find.text('3'), findsNothing);
     expect(find.text('4'), findsNothing);
-    expect(find.text('5'), findsOneWidget);
+    expect(find.text('5'), findsNothing);
 
-    boxSize = globalKeys[5].currentContext.size;
-    expect(boxSize.width, equals(pageSize.width));
-    expect(boxSize.height, equals(pageSize.height));
+    await pageLeft(tester);
+    expect(currentPage, equals(0));
+
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+    expect(find.text('2'), findsNothing);
+    expect(find.text('3'), findsNothing);
+    expect(find.text('4'), findsNothing);
+    expect(find.text('5'), findsNothing);
+  });
+
+  testWidgets('PageView with reverse (RTL)', (WidgetTester tester) async {
+    currentPage = null;
+    await tester.pumpWidget(buildFrame(reverse: true, textDirection: TextDirection.rtl));
+    expect(currentPage, isNull);
+    await pageLeft(tester);
+    expect(currentPage, equals(1));
+
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('2'), findsNothing);
+    expect(find.text('3'), findsNothing);
+    expect(find.text('4'), findsNothing);
+    expect(find.text('5'), findsNothing);
+
+    await pageRight(tester);
+    expect(currentPage, equals(0));
+
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+    expect(find.text('2'), findsNothing);
+    expect(find.text('3'), findsNothing);
+    expect(find.text('4'), findsNothing);
+    expect(find.text('5'), findsNothing);
+
+    await pageRight(tester);
+    expect(currentPage, equals(0));
   });
 }

@@ -1,14 +1,23 @@
 name: flutter_examples_layers
+
+environment:
+  sdk: ^3.10.0-0
+
+resolution: workspace
+
 dependencies:
-
-  # version 0.13.6+1 does not return the value from the command
-  # causing flutter tools to always have exit code 0
-  # see https://github.com/flutter/flutter/issues/6766
-  args: 0.13.6
-
   flutter:
     sdk: flutter
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+
+flutter:
+  assets:
+    - services/data.json
+  uses-material-design: true
+
+# PUBSPEC CHECKSUM: 60tfp7

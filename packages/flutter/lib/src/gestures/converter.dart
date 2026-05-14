@@ -1,212 +1,323 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:ui' as ui show PointerData, PointerChange;
+/// @docImport 'dart:ui';
+library;
+
+import 'dart:ui' as ui show PointerChange, PointerData, PointerSignalKind;
 
 import 'events.dart';
 
-class _PointerState {
-  _PointerState(this.lastPosition);
+export 'dart:ui' show PointerData;
 
-  int get pointer => _pointer; // The identifier used in PointerEvent objects.
-  int _pointer;
-  static int _pointerCount = 0;
-  void startNewPointer() {
-    _pointerCount += 1;
-    _pointer = _pointerCount;
-  }
+export 'events.dart' show PointerEvent;
 
-  bool get down => _down;
-  bool _down = false;
-  void setDown() {
-    assert(!_down);
-    _down = true;
+// Add `kPrimaryButton` to [buttons] when a pointer of certain devices is down.
+//
+// TODO(tongmu): This patch is supposed to be done by embedders. Patching it
+// in framework is a workaround before [PointerEventConverter] is moved to embedders.
+// https://github.com/flutter/flutter/issues/30454
+int _synthesiseDownButtons(int buttons, PointerDeviceKind kind) {
+  switch (kind) {
+    case PointerDeviceKind.mouse:
+    case PointerDeviceKind.trackpad:
+      return buttons;
+    case PointerDeviceKind.touch:
+    case PointerDeviceKind.stylus:
+    case PointerDeviceKind.invertedStylus:
+      return buttons == 0 ? kPrimaryButton : buttons;
+    case PointerDeviceKind.unknown:
+      // We have no information about the device but we know we never want
+      // buttons to be 0 when the pointer is down.
+      return buttons == 0 ? kPrimaryButton : buttons;
   }
-  void setUp() {
-    assert(_down);
-    _down = false;
-  }
-
-  Point lastPosition;
 }
 
-/// Converts from engine pointer data to framework pointer events.
-class PointerEventConverter {
-  // Map from platform pointer identifiers to PointerEvent pointer identifiers.
-  static Map<int, _PointerState> _pointers = <int, _PointerState>{};
+/// Signature for a callback that returns the device pixel ratio of a
+/// [FlutterView] identified by the provided `viewId`.
+///
+/// Returns null if no view with the provided ID exists.
+///
+/// Used by [PointerEventConverter.expand].
+///
+/// See also:
+///
+///  * [FlutterView.devicePixelRatio] for an explanation of device pixel ratio.
+typedef DevicePixelRatioGetter = double? Function(int viewId);
 
-  /// Expand the given packet of pointer data into a sequence of framework pointer events.
-  static Iterable<PointerEvent> expand(Iterable<ui.PointerData> data, double devicePixelRatio) sync* {
-    for (ui.PointerData datum in data) {
-      final Point position = new Point(datum.physicalX, datum.physicalY) / devicePixelRatio;
-      final Duration timeStamp = datum.timeStamp;
-      final PointerDeviceKind kind = datum.kind;
-      switch (datum.change) {
-        case ui.PointerChange.down:
-          assert(!_pointers.containsKey(datum.pointer));
-          _PointerState state = _pointers.putIfAbsent(
-            datum.pointer,
-            () => new _PointerState(position)
-          );
-          assert(state.lastPosition == position);
-          state.startNewPointer();
-          state.setDown();
-          yield new PointerAddedEvent(
-            timeStamp: timeStamp,
-            pointer: state.pointer,
-            kind: kind,
-            position: position,
-            obscured: datum.obscured,
-            pressureMin: datum.pressureMin,
-            pressureMax: datum.pressureMax,
-            distance: datum.distance,
-            distanceMax: datum.distanceMax,
-            radiusMin: datum.radiusMin,
-            radiusMax: datum.radiusMax,
-            orientation: datum.orientation,
-            tilt: datum.tilt
-          );
-          yield new PointerDownEvent(
-            timeStamp: timeStamp,
-            pointer: state.pointer,
-            kind: kind,
-            position: position,
-            buttons: datum.buttons,
-            obscured: datum.obscured,
-            pressure: datum.pressure,
-            pressureMin: datum.pressureMin,
-            pressureMax: datum.pressureMax,
-            distanceMax: datum.distanceMax,
-            radiusMajor: datum.radiusMajor,
-            radiusMinor: datum.radiusMajor,
-            radiusMin: datum.radiusMin,
-            radiusMax: datum.radiusMax,
-            orientation: datum.orientation,
-            tilt: datum.tilt
-          );
-          break;
-        case ui.PointerChange.move:
-          // If the service starts supporting hover pointers, then it must also
-          // start sending us ADDED and REMOVED data points.
-          // See also: https://github.com/flutter/flutter/issues/720
-          assert(_pointers.containsKey(datum.pointer));
-          _PointerState state = _pointers[datum.pointer];
-          assert(state.down);
-          Offset offset = position - state.lastPosition;
-          state.lastPosition = position;
-          yield new PointerMoveEvent(
-            timeStamp: timeStamp,
-            pointer: state.pointer,
-            kind: kind,
-            position: position,
-            delta: offset,
-            down: state.down,
-            buttons: datum.buttons,
-            obscured: datum.obscured,
-            pressure: datum.pressure,
-            pressureMin: datum.pressureMin,
-            pressureMax: datum.pressureMax,
-            distance: datum.distance,
-            distanceMax: datum.distanceMax,
-            radiusMajor: datum.radiusMajor,
-            radiusMinor: datum.radiusMajor,
-            radiusMin: datum.radiusMin,
-            radiusMax: datum.radiusMax,
-            orientation: datum.orientation,
-            tilt: datum.tilt
-          );
-          break;
-        case ui.PointerChange.up:
-        case ui.PointerChange.cancel:
-          assert(_pointers.containsKey(datum.pointer));
-          _PointerState state = _pointers[datum.pointer];
-          assert(state.down);
-          if (position != state.lastPosition) {
-            // Not all sources of pointer packets respect the invariant that
-            // they move the pointer to the up location before sending the up
-            // event. For example, in the iOS simulator, of you drag outside the
-            // window, you'll get a stream of pointers that violates that
-            // invariant. We restore the invariant here for our clients.
-            Offset offset = position - state.lastPosition;
-            state.lastPosition = position;
-            yield new PointerMoveEvent(
-              timeStamp: timeStamp,
-              pointer: state.pointer,
-              kind: kind,
-              position: position,
-              delta: offset,
-              down: state.down,
-              buttons: datum.buttons,
-              obscured: datum.obscured,
-              pressure: datum.pressure,
-              pressureMin: datum.pressureMin,
-              pressureMax: datum.pressureMax,
-              distance: datum.distance,
-              distanceMax: datum.distanceMax,
-              radiusMajor: datum.radiusMajor,
-              radiusMinor: datum.radiusMajor,
-              radiusMin: datum.radiusMin,
-              radiusMax: datum.radiusMax,
-              orientation: datum.orientation,
-              tilt: datum.tilt
-            );
-            state.lastPosition = position;
+/// Converts from engine pointer data to framework pointer events.
+///
+/// This takes [PointerDataPacket] objects, as received from the engine via
+/// [dart:ui.PlatformDispatcher.onPointerDataPacket], and converts them to
+/// [PointerEvent] objects.
+abstract final class PointerEventConverter {
+  /// Expand the given packet of pointer data into a sequence of framework
+  /// pointer events.
+  ///
+  /// The `devicePixelRatioForView` is used to obtain the device pixel ratio for
+  /// the view a particular event occurred in to convert its data from physical
+  /// coordinates to logical pixels. See the discussion at [PointerEvent] for
+  /// more details on the [PointerEvent] coordinate space.
+  static Iterable<PointerEvent> expand(
+    Iterable<ui.PointerData> data,
+    DevicePixelRatioGetter devicePixelRatioForView,
+  ) {
+    return data
+        .where((ui.PointerData datum) => datum.signalKind != ui.PointerSignalKind.unknown)
+        .map<PointerEvent?>((ui.PointerData datum) {
+          final double? devicePixelRatio = devicePixelRatioForView(datum.viewId);
+          if (devicePixelRatio == null) {
+            // View doesn't exist anymore.
+            return null;
           }
-          assert(position == state.lastPosition);
-          state.setUp();
-          if (datum.change == ui.PointerChange.up) {
-            yield new PointerUpEvent(
-              timeStamp: timeStamp,
-              pointer: state.pointer,
-              kind: kind,
-              position: position,
-              buttons: datum.buttons,
-              obscured: datum.obscured,
-              pressureMax: datum.pressureMax,
-              distance: datum.distance,
-              distanceMax: datum.distanceMax,
-              radiusMin: datum.radiusMin,
-              radiusMax: datum.radiusMax,
-              orientation: datum.orientation,
-              tilt: datum.tilt
-            );
-          } else {
-            yield new PointerCancelEvent(
-              timeStamp: timeStamp,
-              pointer: state.pointer,
-              kind: kind,
-              position: position,
-              buttons: datum.buttons,
-              obscured: datum.obscured,
-              pressureMin: datum.pressureMin,
-              pressureMax: datum.pressureMax,
-              distance: datum.distance,
-              distanceMax: datum.distanceMax,
-              radiusMin: datum.radiusMin,
-              radiusMax: datum.radiusMax,
-              orientation: datum.orientation,
-              tilt: datum.tilt
-            );
+          final Offset position = Offset(datum.physicalX, datum.physicalY) / devicePixelRatio;
+          final Offset delta =
+              Offset(datum.physicalDeltaX, datum.physicalDeltaY) / devicePixelRatio;
+          final double radiusMinor = _toLogicalPixels(datum.radiusMinor, devicePixelRatio);
+          final double radiusMajor = _toLogicalPixels(datum.radiusMajor, devicePixelRatio);
+          final double radiusMin = _toLogicalPixels(datum.radiusMin, devicePixelRatio);
+          final double radiusMax = _toLogicalPixels(datum.radiusMax, devicePixelRatio);
+          final Duration timeStamp = datum.timeStamp;
+          final PointerDeviceKind kind = datum.kind;
+          switch (datum.signalKind ?? ui.PointerSignalKind.none) {
+            case ui.PointerSignalKind.none:
+              switch (datum.change) {
+                case ui.PointerChange.add:
+                  return PointerAddedEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    kind: kind,
+                    device: datum.device,
+                    position: position,
+                    obscured: datum.obscured,
+                    pressureMin: datum.pressureMin,
+                    pressureMax: datum.pressureMax,
+                    distance: datum.distance,
+                    distanceMax: datum.distanceMax,
+                    radiusMin: radiusMin,
+                    radiusMax: radiusMax,
+                    orientation: datum.orientation,
+                    tilt: datum.tilt,
+                    embedderId: datum.embedderId,
+                  );
+                case ui.PointerChange.hover:
+                  return PointerHoverEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    kind: kind,
+                    device: datum.device,
+                    position: position,
+                    delta: delta,
+                    buttons: datum.buttons,
+                    obscured: datum.obscured,
+                    pressureMin: datum.pressureMin,
+                    pressureMax: datum.pressureMax,
+                    distance: datum.distance,
+                    distanceMax: datum.distanceMax,
+                    size: datum.size,
+                    radiusMajor: radiusMajor,
+                    radiusMinor: radiusMinor,
+                    radiusMin: radiusMin,
+                    radiusMax: radiusMax,
+                    orientation: datum.orientation,
+                    tilt: datum.tilt,
+                    synthesized: datum.synthesized,
+                    embedderId: datum.embedderId,
+                  );
+                case ui.PointerChange.down:
+                  return PointerDownEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    pointer: datum.pointerIdentifier,
+                    kind: kind,
+                    device: datum.device,
+                    position: position,
+                    buttons: _synthesiseDownButtons(datum.buttons, kind),
+                    obscured: datum.obscured,
+                    pressure: datum.pressure,
+                    pressureMin: datum.pressureMin,
+                    pressureMax: datum.pressureMax,
+                    distanceMax: datum.distanceMax,
+                    size: datum.size,
+                    radiusMajor: radiusMajor,
+                    radiusMinor: radiusMinor,
+                    radiusMin: radiusMin,
+                    radiusMax: radiusMax,
+                    orientation: datum.orientation,
+                    tilt: datum.tilt,
+                    embedderId: datum.embedderId,
+                  );
+                case ui.PointerChange.move:
+                  return PointerMoveEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    pointer: datum.pointerIdentifier,
+                    kind: kind,
+                    device: datum.device,
+                    position: position,
+                    delta: delta,
+                    buttons: _synthesiseDownButtons(datum.buttons, kind),
+                    obscured: datum.obscured,
+                    pressure: datum.pressure,
+                    pressureMin: datum.pressureMin,
+                    pressureMax: datum.pressureMax,
+                    distanceMax: datum.distanceMax,
+                    size: datum.size,
+                    radiusMajor: radiusMajor,
+                    radiusMinor: radiusMinor,
+                    radiusMin: radiusMin,
+                    radiusMax: radiusMax,
+                    orientation: datum.orientation,
+                    tilt: datum.tilt,
+                    platformData: datum.platformData,
+                    synthesized: datum.synthesized,
+                    embedderId: datum.embedderId,
+                  );
+                case ui.PointerChange.up:
+                  return PointerUpEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    pointer: datum.pointerIdentifier,
+                    kind: kind,
+                    device: datum.device,
+                    position: position,
+                    buttons: datum.buttons,
+                    obscured: datum.obscured,
+                    pressure: datum.pressure,
+                    pressureMin: datum.pressureMin,
+                    pressureMax: datum.pressureMax,
+                    distance: datum.distance,
+                    distanceMax: datum.distanceMax,
+                    size: datum.size,
+                    radiusMajor: radiusMajor,
+                    radiusMinor: radiusMinor,
+                    radiusMin: radiusMin,
+                    radiusMax: radiusMax,
+                    orientation: datum.orientation,
+                    tilt: datum.tilt,
+                    embedderId: datum.embedderId,
+                  );
+                case ui.PointerChange.cancel:
+                  return PointerCancelEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    pointer: datum.pointerIdentifier,
+                    kind: kind,
+                    device: datum.device,
+                    position: position,
+                    buttons: datum.buttons,
+                    obscured: datum.obscured,
+                    pressureMin: datum.pressureMin,
+                    pressureMax: datum.pressureMax,
+                    distance: datum.distance,
+                    distanceMax: datum.distanceMax,
+                    size: datum.size,
+                    radiusMajor: radiusMajor,
+                    radiusMinor: radiusMinor,
+                    radiusMin: radiusMin,
+                    radiusMax: radiusMax,
+                    orientation: datum.orientation,
+                    tilt: datum.tilt,
+                    embedderId: datum.embedderId,
+                  );
+                case ui.PointerChange.remove:
+                  return PointerRemovedEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    kind: kind,
+                    device: datum.device,
+                    position: position,
+                    obscured: datum.obscured,
+                    pressureMin: datum.pressureMin,
+                    pressureMax: datum.pressureMax,
+                    distanceMax: datum.distanceMax,
+                    radiusMin: radiusMin,
+                    radiusMax: radiusMax,
+                    embedderId: datum.embedderId,
+                  );
+                case ui.PointerChange.panZoomStart:
+                  return PointerPanZoomStartEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    pointer: datum.pointerIdentifier,
+                    device: datum.device,
+                    position: position,
+                    embedderId: datum.embedderId,
+                    synthesized: datum.synthesized,
+                  );
+                case ui.PointerChange.panZoomUpdate:
+                  final Offset pan = Offset(datum.panX, datum.panY) / devicePixelRatio;
+                  final Offset panDelta =
+                      Offset(datum.panDeltaX, datum.panDeltaY) / devicePixelRatio;
+                  return PointerPanZoomUpdateEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    pointer: datum.pointerIdentifier,
+                    device: datum.device,
+                    position: position,
+                    pan: pan,
+                    panDelta: panDelta,
+                    scale: datum.scale,
+                    rotation: datum.rotation,
+                    embedderId: datum.embedderId,
+                    synthesized: datum.synthesized,
+                  );
+                case ui.PointerChange.panZoomEnd:
+                  return PointerPanZoomEndEvent(
+                    viewId: datum.viewId,
+                    timeStamp: timeStamp,
+                    pointer: datum.pointerIdentifier,
+                    device: datum.device,
+                    position: position,
+                    embedderId: datum.embedderId,
+                    synthesized: datum.synthesized,
+                  );
+              }
+            case ui.PointerSignalKind.scroll:
+              if (!datum.scrollDeltaX.isFinite ||
+                  !datum.scrollDeltaY.isFinite ||
+                  devicePixelRatio <= 0) {
+                return null;
+              }
+              final Offset scrollDelta =
+                  Offset(datum.scrollDeltaX, datum.scrollDeltaY) / devicePixelRatio;
+              return PointerScrollEvent(
+                viewId: datum.viewId,
+                timeStamp: timeStamp,
+                kind: kind,
+                device: datum.device,
+                position: position,
+                scrollDelta: scrollDelta,
+                embedderId: datum.embedderId,
+                onRespond: datum.respond,
+              );
+            case ui.PointerSignalKind.scrollInertiaCancel:
+              return PointerScrollInertiaCancelEvent(
+                viewId: datum.viewId,
+                timeStamp: timeStamp,
+                kind: kind,
+                device: datum.device,
+                position: position,
+                embedderId: datum.embedderId,
+              );
+            case ui.PointerSignalKind.scale:
+              return PointerScaleEvent(
+                viewId: datum.viewId,
+                timeStamp: timeStamp,
+                kind: kind,
+                device: datum.device,
+                position: position,
+                embedderId: datum.embedderId,
+                scale: datum.scale,
+              );
+            case ui.PointerSignalKind.unknown:
+              throw StateError('Unreachable');
           }
-          yield new PointerRemovedEvent(
-            timeStamp: timeStamp,
-            pointer: state.pointer,
-            kind: kind,
-            obscured: datum.obscured,
-            pressureMin: datum.pressureMin,
-            pressureMax: datum.pressureMax,
-            distanceMax: datum.distanceMax,
-            radiusMin: datum.radiusMin,
-            radiusMax: datum.radiusMax
-          );
-          _pointers.remove(datum.pointer);
-          break;
-        default:
-          // TODO(ianh): once https://github.com/flutter/flutter/issues/720 is
-          // done, add real support for PointerAddedEvent and PointerRemovedEvent
-          assert(false);
-      }
-    }
+        })
+        .whereType<PointerEvent>();
   }
+
+  static double _toLogicalPixels(double physicalPixels, double devicePixelRatio) =>
+      physicalPixels / devicePixelRatio;
 }

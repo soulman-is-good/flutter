@@ -1,213 +1,266 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+/// @docImport 'scroll_activity.dart';
+library;
 
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/physics.dart';
 
-final SpringDescription _kScrollSpring = new SpringDescription.withDampingRatio(mass: 0.5, springConstant: 100.0, ratio: 1.1);
-final double _kDrag = 0.025;
-
-// This class is based on Scroller.java from
-// https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/widget
-// The "See" comments refer to Scroller methods and values. Some simplifications
-// have been made.
-class _MountainViewSimulation extends Simulation {
-  _MountainViewSimulation({
-    this.position,
-    this.velocity,
-    this.friction: 0.015,
-  }) {
-    _scaledFriction = friction * _decelerationForFriction(0.84); // See mPhysicalCoeff
-    _duration = _flingDuration(velocity);
-    _distance = _flingDistance(velocity);
+/// An implementation of scroll physics that matches iOS.
+///
+/// See also:
+///
+///  * [ClampingScrollSimulation], which implements Android scroll physics.
+class BouncingScrollSimulation extends Simulation {
+  /// Creates a simulation group for scrolling on iOS, with the given
+  /// parameters.
+  ///
+  /// The position and velocity arguments must use the same units as will be
+  /// expected from the [x] and [dx] methods respectively (typically logical
+  /// pixels and logical pixels per second respectively).
+  ///
+  /// The leading and trailing extents must use the unit of length, the same
+  /// unit as used for the position argument and as expected from the [x]
+  /// method (typically logical pixels).
+  ///
+  /// The units used with the provided [SpringDescription] must similarly be
+  /// consistent with the other arguments. A default set of constants is used
+  /// for the `spring` description if it is omitted; these defaults assume
+  /// that the unit of length is the logical pixel.
+  BouncingScrollSimulation({
+    required double position,
+    required double velocity,
+    required this.leadingExtent,
+    required this.trailingExtent,
+    required this.spring,
+    double constantDeceleration = 0,
+    super.tolerance,
+  }) : assert(leadingExtent <= trailingExtent) {
+    if (position < leadingExtent) {
+      _springSimulation = _underscrollSimulation(position, velocity);
+      _springTime = double.negativeInfinity;
+    } else if (position > trailingExtent) {
+      _springSimulation = _overscrollSimulation(position, velocity);
+      _springTime = double.negativeInfinity;
+    } else {
+      // Taken from UIScrollView.decelerationRate (.normal = 0.998)
+      // 0.998^1000 = ~0.135
+      _frictionSimulation = FrictionSimulation(
+        0.135,
+        position,
+        velocity,
+        constantDeceleration: constantDeceleration,
+      );
+      final double finalX = _frictionSimulation.finalX;
+      if (velocity > 0.0 && finalX > trailingExtent) {
+        _springTime = _frictionSimulation.timeAtX(trailingExtent);
+        _springSimulation = _overscrollSimulation(
+          trailingExtent,
+          math.min(_frictionSimulation.dx(_springTime), maxSpringTransferVelocity),
+        );
+        assert(_springTime.isFinite);
+      } else if (velocity < 0.0 && finalX < leadingExtent) {
+        _springTime = _frictionSimulation.timeAtX(leadingExtent);
+        _springSimulation = _underscrollSimulation(
+          leadingExtent,
+          math.min(_frictionSimulation.dx(_springTime), maxSpringTransferVelocity),
+        );
+        assert(_springTime.isFinite);
+      } else {
+        _springTime = double.infinity;
+      }
+    }
   }
 
+  /// The maximum velocity that can be transferred from the inertia of a ballistic
+  /// scroll into overscroll.
+  static const double maxSpringTransferVelocity = 5000.0;
+
+  /// When [x] falls below this value the simulation switches from an internal friction
+  /// model to a spring model which causes [x] to "spring" back to [leadingExtent].
+  final double leadingExtent;
+
+  /// When [x] exceeds this value the simulation switches from an internal friction
+  /// model to a spring model which causes [x] to "spring" back to [trailingExtent].
+  final double trailingExtent;
+
+  /// The spring used to return [x] to either [leadingExtent] or [trailingExtent].
+  final SpringDescription spring;
+
+  late FrictionSimulation _frictionSimulation;
+  late Simulation _springSimulation;
+  late double _springTime;
+  double _timeOffset = 0.0;
+
+  Simulation _underscrollSimulation(double x, double dx) {
+    return ScrollSpringSimulation(spring, x, leadingExtent, dx);
+  }
+
+  Simulation _overscrollSimulation(double x, double dx) {
+    return ScrollSpringSimulation(spring, x, trailingExtent, dx);
+  }
+
+  Simulation _simulation(double time) {
+    final Simulation simulation;
+    if (time > _springTime) {
+      _timeOffset = _springTime.isFinite ? _springTime : 0.0;
+      simulation = _springSimulation;
+    } else {
+      _timeOffset = 0.0;
+      simulation = _frictionSimulation;
+    }
+    return simulation..tolerance = tolerance;
+  }
+
+  @override
+  double x(double time) => _simulation(time).x(time - _timeOffset);
+
+  @override
+  double dx(double time) => _simulation(time).dx(time - _timeOffset);
+
+  @override
+  bool isDone(double time) => _simulation(time).isDone(time - _timeOffset);
+
+  @override
+  String toString() {
+    return '${objectRuntimeType(this, 'BouncingScrollSimulation')}(leadingExtent: $leadingExtent, trailingExtent: $trailingExtent)';
+  }
+}
+
+/// An implementation of scroll physics that aligns with Android.
+///
+/// For any value of [velocity], this travels the same total distance as the
+/// Android scroll physics.
+///
+/// This scroll physics has been adjusted relative to Android's in order to make
+/// it ballistic, meaning that the deceleration at any moment is a function only
+/// of the current velocity [dx] and does not depend on how long ago the
+/// simulation was started.  (This is required by Flutter's scrolling protocol,
+/// where [ScrollActivityDelegate.goBallistic] may restart a scroll activity
+/// using only its current velocity and the scroll position's own state.)
+/// Compared to this scroll physics, Android's moves faster at the very
+/// beginning, then slower, and it ends at the same place but a little later.
+///
+/// Times are measured in seconds, and positions in logical pixels.
+///
+/// See also:
+///
+///  * [BouncingScrollSimulation], which implements iOS scroll physics.
+//
+// This class is based on OverScroller.java from Android:
+//   https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r24/core/java/android/widget/OverScroller.java#738
+// and in particular class SplineOverScroller (at the end of the file), starting
+// at method "fling".  (A very similar algorithm is in Scroller.java in the same
+// directory, but OverScroller is what's used by RecyclerView.)
+//
+// In the Android implementation, times are in milliseconds, positions are in
+// physical pixels, but velocity is in physical pixels per whole second.
+//
+// The "See..." comments below refer to SplineOverScroller methods and values.
+class ClampingScrollSimulation extends Simulation {
+  /// Creates a scroll physics simulation that aligns with Android scrolling.
+  ClampingScrollSimulation({
+    required this.position,
+    required this.velocity,
+    this.friction = 0.015,
+    super.tolerance,
+  }) {
+    _duration = _flingDuration();
+    _distance = _flingDistance();
+  }
+
+  /// The position of the particle at the beginning of the simulation, in
+  /// logical pixels.
   final double position;
+
+  /// The velocity at which the particle is traveling at the beginning of the
+  /// simulation, in logical pixels per second.
   final double velocity;
+
+  /// The amount of friction the particle experiences as it travels.
+  ///
+  /// The more friction the particle experiences, the sooner it stops and the
+  /// less far it travels.
+  ///
+  /// The default value causes the particle to travel the same total distance
+  /// as in the Android scroll physics.
+  // See mFlingFriction.
   final double friction;
 
-  double _scaledFriction;
-  double _duration;
-  double _distance;
+  /// The total time the simulation will run, in seconds.
+  late double _duration;
 
-  // See DECELERATION_RATE
-  static final double _decelerationRate = math.log(0.78) / math.log(0.9);
+  /// The total, signed, distance the simulation will travel, in logical pixels.
+  late double _distance;
 
-  // See computeDeceleration().
-  double _decelerationForFriction(double friction) {
-    return friction * 61774.04968;
+  // See DECELERATION_RATE.
+  static final double _kDecelerationRate = math.log(0.78) / math.log(0.9);
+
+  // See INFLEXION.
+  static const double _kInflexion = 0.35;
+
+  // See mPhysicalCoeff.  This has a value of 0.84 times Earth gravity,
+  // expressed in units of logical pixels per second^2.
+  static const double _physicalCoeff =
+      9.80665 // g, in meters per second^2
+      *
+      39.37 // 1 meter / 1 inch
+      *
+      160.0 // 1 inch / 1 logical pixel
+      *
+      0.84; // "look and feel tuning"
+
+  // See getSplineFlingDuration().
+  double _flingDuration() {
+    // See getSplineDeceleration().  That function's value is
+    // math.log(velocity.abs() / referenceVelocity).
+    final double referenceVelocity = friction * _physicalCoeff / _kInflexion;
+
+    // This is the value getSplineFlingDuration() would return, but in seconds.
+    final androidDuration =
+        math.pow(velocity.abs() / referenceVelocity, 1 / (_kDecelerationRate - 1.0)) as double;
+
+    // We finish a bit sooner than Android, in order to travel the
+    // same total distance.
+    return _kDecelerationRate * _kInflexion * androidDuration;
   }
 
-  // See getSplineDeceleration()
-  double _flingDeceleration(double velocity) {
-    return math.log(0.35 * velocity.abs() / _scaledFriction);
-  }
-  // See getSplineFlingDuration(). Returns a value in seconds.
-  double _flingDuration(double velocity) {
-    return math.exp(_flingDeceleration(velocity) / (_decelerationRate - 1.0));
-  }
-
-  // See getSplineFlingDistance()
-  double _flingDistance(double velocity) {
-    final double rate = _decelerationRate / (_decelerationRate - 1.0) * _flingDeceleration(velocity);
-    return _scaledFriction * math.exp(rate);
-  }
-
-  // Based on a cubic curve fit to the computeScrollOffset() values produced
-  // for an initial velocity of 4000. The value of scroller.getDuration()
-  // and scroller.getFinalY() were 686ms and 961 pixels respectively.
-  // Algebra courtesy of Wolfram Alpha.
-  //
-  // f(x) = scrollOffset, x is time in millseconds
-  // f(x) = 3.60882×10^-6 x^3 - 0.00668009 x^2 + 4.29427 x - 3.15307
-  // f(x) = 3.60882×10^-6 x^3 - 0.00668009 x^2 + 4.29427 x, so f(0) is 0
-  // f(686ms) = 961 pixels
-  // Scale to f(0 <= t <= 1.0), x = t * 686
-  // f(t) = 1165.03 t^3 - 3143.62 t^2 + 2945.87 t
-  // Scale f(t) so that 0.0 <= f(t) <= 1.0
-  // f(t) = (1165.03 t^3 - 3143.62 t^2 + 2945.87 t) / 961.0
-  //      = 1.2 t^3 - 3.27 t^2 + 3.065 t
-  double _flingDistancePenetration(double t) {
-    return (1.2 * t * t * t) - (3.27 * t * t) + (3.065 * t);
-  }
-
-  // The deriviate of the _flingPenetration() function.
-  double _flingVelocityPenetration(double t) {
-    return (3.63693 * t * t) - (6.5424 * t) + 3.06542;
+  // See getSplineFlingDistance().  This returns the same value but with the
+  // sign of [velocity], and in logical pixels.
+  double _flingDistance() {
+    final double distance = velocity * _duration / _kDecelerationRate;
+    assert(() {
+      // This is the more complicated calculation that getSplineFlingDistance()
+      // actually performs, which boils down to the much simpler formula above.
+      final double referenceVelocity = friction * _physicalCoeff / _kInflexion;
+      final double logVelocity = math.log(velocity.abs() / referenceVelocity);
+      final double distanceAgain =
+          friction *
+          _physicalCoeff *
+          math.exp(logVelocity * _kDecelerationRate / (_kDecelerationRate - 1.0));
+      return (distance.abs() - distanceAgain).abs() < tolerance.distance;
+    }());
+    return distance;
   }
 
   @override
   double x(double time) {
-    final double t = (time / _duration).clamp(0.0, 1.0);
-    return position + _distance * _flingDistancePenetration(t) * velocity.sign;
+    final double t = clampDouble(time / _duration, 0.0, 1.0);
+    return position + _distance * (1.0 - math.pow(1.0 - t, _kDecelerationRate));
   }
 
   @override
   double dx(double time) {
-    final double t = (time / _duration).clamp(0.0, 1.0);
-    return velocity * _flingVelocityPenetration(t);
+    final double t = clampDouble(time / _duration, 0.0, 1.0);
+    return velocity * math.pow(1.0 - t, _kDecelerationRate - 1.0);
   }
 
   @override
   bool isDone(double time) {
     return time >= _duration;
-  }
-}
-
-class _CupertinoSimulation extends FrictionSimulation {
-  static const double drag = 0.135;
-  _CupertinoSimulation({ double position, double velocity })
-    : super(drag, position, velocity * 0.91);
-}
-
-/// Composite simulation for scrollable interfaces.
-///
-/// Simulates kinetic scrolling behavior between a leading and trailing
-/// boundary. Friction is applied within the extents and a spring action is
-/// applied at the boundaries. This simulation can only step forward.
-class ScrollSimulation extends SimulationGroup {
-  /// Creates a [ScrollSimulation] with the given parameters.
-  ///
-  /// The position and velocity arguments must use the same units as will be
-  /// expected from the [x] and [dx] methods respectively.
-  ///
-  /// The leading and trailing extents must use the unit of length, the same
-  /// unit as used for the position argument and as expected from the [x]
-  /// method.
-  ///
-  /// The units used with the provided [SpringDescription] must similarly be
-  /// consistent with the other arguments.
-  ///
-  /// The final argument is the coefficient of friction, which is unitless.
-  ScrollSimulation({
-    double position,
-    double velocity,
-    double leadingExtent,
-    double trailingExtent,
-    SpringDescription spring,
-    double drag,
-    TargetPlatform platform,
-  }) : _leadingExtent = leadingExtent,
-       _trailingExtent = trailingExtent,
-       _spring = spring ?? _kScrollSpring,
-       _drag = drag ?? _kDrag,
-       _platform = platform {
-    assert(_leadingExtent != null);
-    assert(_trailingExtent != null);
-    assert(_spring != null);
-    _chooseSimulation(position, velocity, 0.0);
-  }
-
-  final double _leadingExtent;
-  final double _trailingExtent;
-  final SpringDescription _spring;
-  final double _drag;
-  final TargetPlatform _platform;
-
-  bool _isSpringing = false;
-  Simulation _currentSimulation;
-  double _offset = 0.0;
-
-  @override
-  bool step(double time) => _chooseSimulation(
-      _currentSimulation.x(time - _offset),
-      _currentSimulation.dx(time - _offset), time);
-
-  @override
-  Simulation get currentSimulation => _currentSimulation;
-
-  @override
-  double get currentIntervalOffset => _offset;
-
-  bool _chooseSimulation(double position, double velocity, double intervalOffset) {
-    if (_spring == null && (position > _trailingExtent || position < _leadingExtent))
-      return false;
-
-    // This simulation can only step forward.
-    if (!_isSpringing) {
-      if (position > _trailingExtent) {
-        _isSpringing = true;
-        _offset = intervalOffset;
-        _currentSimulation = new ScrollSpringSimulation(_spring, position, _trailingExtent, velocity);
-        return true;
-      } else if (position < _leadingExtent) {
-        _isSpringing = true;
-        _offset = intervalOffset;
-        _currentSimulation = new ScrollSpringSimulation(_spring, position, _leadingExtent, velocity);
-        return true;
-      }
-    }
-
-    if (_currentSimulation == null) {
-      switch (_platform) {
-        case TargetPlatform.android:
-        case TargetPlatform.fuchsia:
-          _currentSimulation = new _MountainViewSimulation(
-            position: position,
-            velocity: velocity,
-          );
-          break;
-        case TargetPlatform.iOS:
-          _currentSimulation = new _CupertinoSimulation(
-            position: position,
-            velocity: velocity,
-          );
-          break;
-      }
-      // No platform specified
-      _currentSimulation ??= new FrictionSimulation(_drag, position, velocity);
-
-      return true;
-    }
-
-    return false;
-  }
-
-  @override
-  String toString() {
-    return 'ScrollSimulation(leadingExtent: $_leadingExtent, trailingExtent: $_trailingExtent)';
   }
 }

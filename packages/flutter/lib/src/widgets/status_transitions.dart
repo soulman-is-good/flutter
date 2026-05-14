@@ -1,8 +1,6 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-import 'package:meta/meta.dart';
 
 import 'basic.dart';
 import 'framework.dart';
@@ -10,14 +8,7 @@ import 'framework.dart';
 /// A widget that rebuilds when the given animation changes status.
 abstract class StatusTransitionWidget extends StatefulWidget {
   /// Initializes fields for subclasses.
-  ///
-  /// The [animation] argument must not be null.
-  StatusTransitionWidget({
-    Key key,
-    @required this.animation
-  }) : super(key: key) {
-    assert(animation != null);
-  }
+  const StatusTransitionWidget({super.key, required this.animation});
 
   /// The animation to which this widget is listening.
   final Animation<double> animation;
@@ -27,27 +18,28 @@ abstract class StatusTransitionWidget extends StatefulWidget {
   Widget build(BuildContext context);
 
   @override
-  _StatusTransitionState createState() => new _StatusTransitionState();
+  State<StatusTransitionWidget> createState() => _StatusTransitionState();
 }
 
 class _StatusTransitionState extends State<StatusTransitionWidget> {
   @override
   void initState() {
     super.initState();
-    config.animation.addStatusListener(_animationStatusChanged);
+    widget.animation.addStatusListener(_animationStatusChanged);
   }
 
   @override
-  void didUpdateConfig(StatusTransitionWidget oldConfig) {
-    if (config.animation != oldConfig.animation) {
-      oldConfig.animation.removeStatusListener(_animationStatusChanged);
-      config.animation.addStatusListener(_animationStatusChanged);
+  void didUpdateWidget(StatusTransitionWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animation != oldWidget.animation) {
+      oldWidget.animation.removeStatusListener(_animationStatusChanged);
+      widget.animation.addStatusListener(_animationStatusChanged);
     }
   }
 
   @override
   void dispose() {
-    config.animation.removeStatusListener(_animationStatusChanged);
+    widget.animation.removeStatusListener(_animationStatusChanged);
     super.dispose();
   }
 
@@ -59,6 +51,6 @@ class _StatusTransitionState extends State<StatusTransitionWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return config.build(context);
+    return widget.build(context);
   }
 }

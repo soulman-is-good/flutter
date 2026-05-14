@@ -1,140 +1,126 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+/// @docImport 'grid_tile.dart';
+/// @docImport 'icon_button.dart';
+library;
 
 import 'package:flutter/widgets.dart';
 
 import 'colors.dart';
-import 'icon_theme.dart';
-import 'icon_theme_data.dart';
 import 'theme.dart';
 
-/// A header used in a material design [GridTile].
+/// A header used in a Material Design [GridTile].
 ///
 /// Typically used to add a one or two line header or footer on a [GridTile].
 ///
 /// For a one-line header, include a [title] widget. To add a second line, also
-/// include a [subtitle] wiget. Use [leading] or [trailing] to add an icon.
+/// include a [subtitle] widget. Use [leading] or [trailing] to add an icon.
 ///
 /// See also:
 ///
 ///  * [GridTile]
-///  * <https://material.google.com/components/grid-lists.html#grid-lists-specs>
+///  * <https://material.io/design/components/image-lists.html#anatomy>
 class GridTileBar extends StatelessWidget {
   /// Creates a grid tile bar.
   ///
   /// Typically used to with [GridTile].
-  GridTileBar({
-    Key key,
+  const GridTileBar({
+    super.key,
     this.backgroundColor,
     this.leading,
     this.title,
     this.subtitle,
-    this.trailing
-  }) : super(key: key);
+    this.trailing,
+  });
 
   /// The color to paint behind the child widgets.
   ///
   /// Defaults to transparent.
-  final Color backgroundColor;
+  final Color? backgroundColor;
 
   /// A widget to display before the title.
   ///
   /// Typically an [Icon] or an [IconButton] widget.
-  final Widget leading;
+  final Widget? leading;
 
   /// The primary content of the list item.
   ///
   /// Typically a [Text] widget.
-  final Widget title;
+  final Widget? title;
 
   /// Additional content displayed below the title.
   ///
   /// Typically a [Text] widget.
-  final Widget subtitle;
+  final Widget? subtitle;
 
   /// A widget to display after the title.
   ///
   /// Typically an [Icon] or an [IconButton] widget.
-  final Widget trailing;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    BoxDecoration decoration;
-    if (backgroundColor != null)
-      decoration = new BoxDecoration(backgroundColor: backgroundColor);
-
-    EdgeInsets padding;
-    if (leading != null && trailing != null)
-      padding = const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0);
-    else if (leading != null)
-      padding = const EdgeInsets.only(left: 8.0, right: 16.0, top: 16.0, bottom: 16.0);
-    else // trailing != null || (leading == null && trailing == null)
-      padding = const EdgeInsets.only(left: 16.0, right: 8.0, top: 16.0, bottom: 16.0);
-
-    final List<Widget> children = <Widget>[];
-
-    if (leading != null)
-      children.add(new Padding(padding: const EdgeInsets.only(right: 8.0), child: leading));
-
-    ThemeData theme = Theme.of(context);
-    ThemeData darkTheme = new ThemeData(
-      brightness: Brightness.dark,
-      accentColor: theme.accentColor,
-      accentColorBrightness: theme.accentColorBrightness
-    );
-    if (title != null && subtitle != null) {
-      children.add(
-        new Flexible(
-          child: new Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              new DefaultTextStyle(
-                style: darkTheme.textTheme.subhead,
-                softWrap: false,
-                overflow: TextOverflow.ellipsis,
-                child: title
-              ),
-              new DefaultTextStyle(
-                style: darkTheme.textTheme.caption,
-                softWrap: false,
-                overflow: TextOverflow.ellipsis,
-                child: subtitle
-              )
-            ]
-          )
-        )
-      );
-    } else if (title != null || subtitle != null) {
-      children.add(
-        new Flexible(
-          child: new DefaultTextStyle(
-            style: darkTheme.textTheme.subhead,
-            softWrap: false,
-            overflow: TextOverflow.ellipsis,
-            child: title ?? subtitle
-          )
-        )
-      );
+    BoxDecoration? decoration;
+    if (backgroundColor != null) {
+      decoration = BoxDecoration(color: backgroundColor);
     }
 
-    if (trailing != null)
-      children.add(new Padding(padding: const EdgeInsets.only(left: 8.0), child: trailing));
+    final padding = EdgeInsetsDirectional.only(
+      start: leading != null ? 8.0 : 16.0,
+      end: trailing != null ? 8.0 : 16.0,
+    );
 
-    return new Container(
+    final darkTheme = ThemeData.dark();
+    return Container(
       padding: padding,
       decoration: decoration,
-      child: new Theme(
+      height: (title != null && subtitle != null) ? 68.0 : 48.0,
+      child: Theme(
         data: darkTheme,
-        child: new IconTheme.merge(
-          context: context,
-          data: new IconThemeData(color: Colors.white),
-          child: new Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: children
-          )
-        )
-      )
+        child: IconTheme.merge(
+          data: const IconThemeData(color: Colors.white),
+          child: Row(
+            children: <Widget>[
+              if (leading != null)
+                Padding(padding: const EdgeInsetsDirectional.only(end: 8.0), child: leading),
+              if (title != null && subtitle != null)
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      DefaultTextStyle(
+                        style: darkTheme.textTheme.titleMedium!,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        child: title!,
+                      ),
+                      DefaultTextStyle(
+                        style: darkTheme.textTheme.bodySmall!,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        child: subtitle!,
+                      ),
+                    ],
+                  ),
+                )
+              else if (title != null || subtitle != null)
+                Expanded(
+                  child: DefaultTextStyle(
+                    style: darkTheme.textTheme.titleMedium!,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    child: title ?? subtitle!,
+                  ),
+                ),
+              if (trailing != null)
+                Padding(padding: const EdgeInsetsDirectional.only(start: 8.0), child: trailing),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

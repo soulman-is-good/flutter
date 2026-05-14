@@ -1,4 +1,4 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -8,22 +8,24 @@
 import 'package:flutter/material.dart'; // Imported just for its color palette.
 import 'package:flutter/rendering.dart';
 
+import 'src/binding.dart';
+
 // Material design colors. :p
 List<Color> _kColors = <Color>[
-  Colors.teal[500],
-  Colors.amber[500],
-  Colors.purple[500],
-  Colors.lightBlue[500],
-  Colors.deepPurple[500],
-  Colors.lime[500],
+  Colors.teal,
+  Colors.amber,
+  Colors.purple,
+  Colors.lightBlue,
+  Colors.deepPurple,
+  Colors.lime,
 ];
 
 /// A simple model object for a dot that reacts to pointer pressure.
 class Dot {
-  Dot({ Color color }) : _paint = new Paint()..color = color;
+  Dot({required Color color}) : _paint = Paint()..color = color;
 
   final Paint _paint;
-  Point position = Point.origin;
+  Offset position = Offset.zero;
   double radius = 0.0;
 
   void update(PointerEvent event) {
@@ -48,7 +50,7 @@ class RenderDots extends RenderBox {
   @override
   bool get sizedByParent => true;
 
-  /// By selecting the biggest value permitted by the incomming constraints
+  /// By selecting the biggest value permitted by the incoming constraints
   /// during layout, this function makes this render object as large as
   /// possible (i.e., fills the entire screen).
   @override
@@ -58,15 +60,15 @@ class RenderDots extends RenderBox {
 
   /// Makes this render object hittable so that it receives pointer events.
   @override
-  bool hitTestSelf(Point position) => true;
+  bool hitTestSelf(Offset position) => true;
 
   /// Processes pointer events by mutating state and invalidating its previous
   /// painting commands.
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
     if (event is PointerDownEvent) {
-      Color color = _kColors[event.pointer.remainder(_kColors.length)];
-      _dots[event.pointer] = new Dot(color: color)..update(event);
+      final Color color = _kColors[event.pointer.remainder(_kColors.length)];
+      _dots[event.pointer] = Dot(color: color)..update(event);
       // We call markNeedsPaint to indicate that our painting commands have
       // changed and that paint needs to be called before displaying a new frame
       // to the user. It's harmless to call markNeedsPaint multiple times
@@ -76,7 +78,7 @@ class RenderDots extends RenderBox {
       _dots.remove(event.pointer);
       markNeedsPaint();
     } else if (event is PointerMoveEvent) {
-      _dots[event.pointer].update(event);
+      _dots[event.pointer]!.update(event);
       markNeedsPaint();
     }
   }
@@ -86,35 +88,35 @@ class RenderDots extends RenderBox {
   void paint(PaintingContext context, Offset offset) {
     final Canvas canvas = context.canvas;
     // The "size" property indicates the size of that this render box was
-    // alotted during layout. Here we paint our bounds white. Notice that we're
+    // allotted during layout. Here we paint our bounds white. Notice that we're
     // located at "offset" from the origin of the canvas' coordinate system.
     // Passing offset during the render tree's paint walk is an optimization to
     // avoid having to change the origin of the canvas's coordinate system too
     // often.
-    canvas.drawRect(offset & size, new Paint()..color = const Color(0xFFFFFFFF));
+    canvas.drawRect(offset & size, Paint()..color = const Color(0xFFFFFFFF));
 
     // We iterate through our model and paint each dot.
-    for (Dot dot in _dots.values)
+    for (final Dot dot in _dots.values) {
       dot.paint(canvas, offset);
+    }
   }
 }
 
 void main() {
   // Create some styled text to tell the user to interact with the app.
-  RenderParagraph paragraph = new RenderParagraph(
-    new TextSpan(
-      style: new TextStyle(color: Colors.black87),
-      text: "Touch me!"
-    )
+  final paragraph = RenderParagraph(
+    const TextSpan(
+      style: TextStyle(color: Colors.black87),
+      text: 'Touch me!',
+    ),
+    textDirection: TextDirection.ltr,
   );
   // A stack is a render object that layers its children on top of each other.
   // The bottom later is our RenderDots object, and on top of that we show the
   // text.
-  RenderStack stack = new RenderStack(
-    children: <RenderBox>[
-      new RenderDots(),
-      paragraph,
-    ]
+  final stack = RenderStack(
+    textDirection: TextDirection.ltr,
+    children: <RenderBox>[RenderDots(), paragraph],
   );
   // The "parentData" field of a render object is controlled by the render
   // object's parent render object. Now that we've added the paragraph as a
@@ -124,11 +126,11 @@ void main() {
   //
   // We use the StackParentData of the paragraph to position the text in the top
   // left corner of the screen.
-  final StackParentData paragraphParentData = paragraph.parentData;
+  final paragraphParentData = paragraph.parentData! as StackParentData;
   paragraphParentData
     ..top = 40.0
     ..left = 20.0;
 
   // Finally, we attach the render tree we've built to the screen.
-  new RenderingFlutterBinding(root: stack);
+  ViewRenderingFlutterBinding(root: stack).scheduleFrame();
 }

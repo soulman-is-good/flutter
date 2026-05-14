@@ -1,80 +1,107 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:io';
 
-import '../cache.dart';
+import '../application_package.dart';
+import '../base/common.dart';
+import '../base/io.dart';
 import '../device.dart';
-import '../globals.dart';
+import '../globals.dart' as globals;
 import '../runner/flutter_command.dart';
 
 class LogsCommand extends FlutterCommand {
-  LogsCommand() {
-    argParser.addFlag('clear',
+  LogsCommand({required this.sigint, required this.sigterm}) {
+    argParser.addFlag(
+      'clear',
       negatable: false,
       abbr: 'c',
-      help: 'Clear log history before reading from logs.'
+      help: 'Clear log history before reading from logs.',
     );
+    usesDeviceTimeoutOption();
+    usesDeviceConnectionOption();
   }
 
   @override
-  final String name = 'logs';
+  final name = 'logs';
 
   @override
-  final String description = 'Show log output for running Flutter apps.';
-
-  Device device;
+  final description = 'Show log output for running Flutter apps.';
 
   @override
-  Future<int> verifyThenRunCommand() async {
-    device = await findTargetDevice();
-    if (device == null)
-      return 1;
-    return super.verifyThenRunCommand();
+  final String category = FlutterCommandCategory.tools;
+
+  @override
+  bool get refreshWirelessDevices => true;
+
+  @override
+  Future<Set<DevelopmentArtifact>> get requiredArtifacts async => const <DevelopmentArtifact>{};
+
+  Device? device;
+  final ProcessSignal sigint;
+  final ProcessSignal sigterm;
+
+  @override
+  Future<FlutterCommandResult> verifyThenRunCommand(String? commandPath) async {
+    device = await findTargetDevice(includeDevicesUnsupportedByProject: true);
+    if (device == null) {
+      throwToolExit(null);
+    }
+    return super.verifyThenRunCommand(commandPath);
   }
 
   @override
-  Future<int> runCommand() async {
-    if (argResults['clear'])
-      device.clearLogs();
+  Future<FlutterCommandResult> runCommand() async {
+    final Device cachedDevice = device!;
+    if (boolArg('clear')) {
+      cachedDevice.clearLogs();
+    }
 
-    DeviceLogReader logReader = device.logReader;
+    final ApplicationPackage? app = await applicationPackages?.getPackageForPlatform(
+      await cachedDevice.targetPlatform,
+    );
 
-    Cache.releaseLockEarly();
+    final DeviceLogReader logReader = await cachedDevice.getLogReader(app: app);
 
-    printStatus('Showing $logReader logs:');
+    globals.printStatus('Showing $logReader logs:');
 
-    Completer<int> exitCompleter = new Completer<int>();
+    final exitCompleter = Completer<int>();
+
+    // First check if we already completed by another branch before completing
+    // with [exitCode].
+    void maybeComplete([int exitCode = 0]) {
+      if (exitCompleter.isCompleted) {
+        return;
+      }
+      exitCompleter.complete(exitCode);
+    }
 
     // Start reading.
-    StreamSubscription<String> subscription = logReader.logLines.listen(
-      printStatus,
-      onDone: () {
-        exitCompleter.complete(0);
-      },
-      onError: (dynamic error) {
-        exitCompleter.complete(error is int ? error : 1);
-      }
+    final StreamSubscription<String> subscription = logReader.logLines.listen(
+      (String message) => globals.printStatus(message, wrap: false),
+      onDone: () => maybeComplete(),
+      onError: (dynamic error) => maybeComplete(error is int ? error : 1),
     );
 
     // When terminating, close down the log reader.
-    ProcessSignal.SIGINT.watch().listen((ProcessSignal signal) {
+    sigint.watch().listen((ProcessSignal signal) {
       subscription.cancel();
-      printStatus('');
-      exitCompleter.complete(0);
+      maybeComplete();
+      globals.printStatus('');
     });
-    ProcessSignal.SIGTERM.watch().listen((ProcessSignal signal) {
+    sigterm.watch().listen((ProcessSignal signal) {
       subscription.cancel();
-      exitCompleter.complete(0);
+      maybeComplete();
     });
 
     // Wait for the log reader to be finished.
-    int result = await exitCompleter.future;
-    subscription.cancel();
-    if (result != 0)
-      printError('Error listening to $logReader logs.');
-    return result;
+    final int result = await exitCompleter.future;
+    await subscription.cancel();
+    if (result != 0) {
+      throwToolExit('Error listening to $logReader logs.');
+    }
+
+    return FlutterCommandResult.success();
   }
 }

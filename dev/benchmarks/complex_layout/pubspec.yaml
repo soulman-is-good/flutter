@@ -1,24 +1,37 @@
 name: complex_layout
-description: A new flutter project.
+description: A benchmark of a relatively complex layout.
+
+environment:
+  sdk: ^3.10.0-0
+
+resolution: workspace
 
 dependencies:
-
-  # version 0.13.6+1 does not return the value from the command
-  # causing flutter tools to always have exit code 0
-  # see https://github.com/flutter/flutter/issues/6766
-  args: 0.13.6
-
   flutter:
     sdk: flutter
   flutter_driver:
     sdk: flutter
 
-  # Also examples/flutter_gallery/pubspec.yaml
-  flutter_gallery_assets:
-    git:
-      url: https://flutter.googlesource.com/gallery-assets
-      ref: ef928550119411358b8b25e16aecde6ace513526
+  # To change the version of the gallery assets, edit
+  #   //packages/flutter_tools/lib/src/commands/update_packages.dart
+  # and run
+  #   flutter update-packages --force-upgrade
+  flutter_gallery_assets: any
+
+  path: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  test: any
+  integration_test:
+    sdk: flutter
+
+
+flutter:
+  uses-material-design: true
+  assets:
+    - packages/flutter_gallery_assets/people/square/ali.png
+    - packages/flutter_gallery_assets/places/india_chettinad_silk_maker.png
+
+# PUBSPEC CHECKSUM: o8fml4

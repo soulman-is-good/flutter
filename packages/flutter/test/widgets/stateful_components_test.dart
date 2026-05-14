@@ -1,15 +1,15 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 class InnerWidget extends StatefulWidget {
-  InnerWidget({ Key key }) : super(key: key);
+  const InnerWidget({super.key});
 
   @override
-  InnerWidgetState createState() => new InnerWidgetState();
+  InnerWidgetState createState() => InnerWidgetState();
 }
 
 class InnerWidgetState extends State<InnerWidget> {
@@ -23,64 +23,64 @@ class InnerWidgetState extends State<InnerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return new Container();
+    return Container();
   }
 }
 
 class OuterContainer extends StatefulWidget {
-  OuterContainer({ Key key, this.child }) : super(key: key);
+  const OuterContainer({super.key, required this.child});
 
   final InnerWidget child;
 
   @override
-  OuterContainerState createState() => new OuterContainerState();
+  OuterContainerState createState() => OuterContainerState();
 }
 
 class OuterContainerState extends State<OuterContainer> {
   @override
   Widget build(BuildContext context) {
-    return config.child;
+    return widget.child;
   }
 }
 
 void main() {
   testWidgets('resync stateful widget', (WidgetTester tester) async {
-    Key innerKey = new Key('inner');
-    Key outerKey = new Key('outer');
+    const innerKey = Key('inner');
+    const outerKey = Key('outer');
 
-    InnerWidget inner1 = new InnerWidget(key: innerKey);
+    const inner1 = InnerWidget(key: innerKey);
     InnerWidget inner2;
-    OuterContainer outer1 = new OuterContainer(key: outerKey, child: inner1);
+    const outer1 = OuterContainer(key: outerKey, child: inner1);
     OuterContainer outer2;
 
     await tester.pumpWidget(outer1);
 
-    StatefulElement innerElement = tester.element(find.byKey(innerKey));
-    InnerWidgetState innerElementState = innerElement.state;
-    expect(innerElementState.config, equals(inner1));
+    final StatefulElement innerElement = tester.element(find.byKey(innerKey));
+    final innerElementState = innerElement.state as InnerWidgetState;
+    expect(innerElementState.widget, equals(inner1));
     expect(innerElementState._didInitState, isTrue);
-    expect(innerElement.renderObject.attached, isTrue);
+    expect(innerElement.renderObject!.attached, isTrue);
 
-    inner2 = new InnerWidget(key: innerKey);
-    outer2 = new OuterContainer(key: outerKey, child: inner2);
+    inner2 = const InnerWidget(key: innerKey);
+    outer2 = OuterContainer(key: outerKey, child: inner2);
 
     await tester.pumpWidget(outer2);
 
     expect(tester.element(find.byKey(innerKey)), equals(innerElement));
     expect(innerElement.state, equals(innerElementState));
 
-    expect(innerElementState.config, equals(inner2));
+    expect(innerElementState.widget, equals(inner2));
     expect(innerElementState._didInitState, isTrue);
-    expect(innerElement.renderObject.attached, isTrue);
+    expect(innerElement.renderObject!.attached, isTrue);
 
-    StatefulElement outerElement = tester.element(find.byKey(outerKey));
-    expect(outerElement.state.config, equals(outer2));
+    final StatefulElement outerElement = tester.element(find.byKey(outerKey));
+    expect(outerElement.state.widget, equals(outer2));
     outerElement.markNeedsBuild();
     await tester.pump();
 
     expect(tester.element(find.byKey(innerKey)), equals(innerElement));
     expect(innerElement.state, equals(innerElementState));
-    expect(innerElementState.config, equals(inner2));
-    expect(innerElement.renderObject.attached, isTrue);
+    expect(innerElementState.widget, equals(inner2));
+    expect(innerElement.renderObject!.attached, isTrue);
   });
 }

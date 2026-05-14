@@ -1,27 +1,70 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io';
 import 'package:flutter/gestures.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../common.dart';
 import 'data/velocity_tracker_data.dart';
 
 const int _kNumIters = 10000;
 
-void main() {
-  final VelocityTracker tracker = new VelocityTracker();
-  final Stopwatch watch = new Stopwatch();
-  print('Velocity tracker benchmark...');
-  watch.start();
-  for (int i = 0; i < _kNumIters; i += 1) {
-    for (PointerEvent event in velocityEventData) {
-      if (event is PointerDownEvent || event is PointerMoveEvent)
-        tracker.addPosition(event.timeStamp, event.position);
-      if (event is PointerUpEvent)
-        tracker.getVelocity();
+class TrackerBenchmark {
+  TrackerBenchmark({required this.name, required this.tracker});
+
+  final VelocityTracker tracker;
+  final String name;
+}
+
+Future<void> execute() async {
+  assert(false, "Don't run benchmarks in debug mode! Use 'flutter run --release'.");
+  final printer = BenchmarkResultPrinter();
+  final benchmarks = <TrackerBenchmark>[
+    TrackerBenchmark(
+      name: 'velocity_tracker_iteration',
+      tracker: VelocityTracker.withKind(PointerDeviceKind.touch),
+    ),
+    TrackerBenchmark(
+      name: 'velocity_tracker_iteration_ios_fling',
+      tracker: IOSScrollViewFlingVelocityTracker(PointerDeviceKind.touch),
+    ),
+  ];
+  final watch = Stopwatch();
+
+  await benchmarkWidgets((WidgetTester tester) async {
+    for (final benchmark in benchmarks) {
+      print('${benchmark.name} benchmark...');
+      final VelocityTracker tracker = benchmark.tracker;
+      watch.reset();
+      watch.start();
+      for (var i = 0; i < _kNumIters; i += 1) {
+        for (final PointerEvent event in velocityEventData) {
+          if (event is PointerDownEvent || event is PointerMoveEvent) {
+            tracker.addPosition(event.timeStamp, event.position);
+          }
+          if (event is PointerUpEvent) {
+            tracker.getVelocity();
+          }
+        }
+      }
+      watch.stop();
+
+      printer.addResult(
+        description: 'Velocity tracker: ${tracker.runtimeType}',
+        value: watch.elapsedMicroseconds / _kNumIters,
+        unit: 'µs per iteration',
+        name: benchmark.name,
+      );
     }
-  }
-  watch.stop();
-  print('Velocity tracker: ${(watch.elapsedMicroseconds / _kNumIters).toStringAsFixed(1)}µs per iteration');
-  exit(0);
+  });
+
+  printer.printToStdout();
+}
+
+//
+//  Note that the benchmark is normally run by benchmark_collection.dart.
+//
+Future<void> main() async {
+  return execute();
 }

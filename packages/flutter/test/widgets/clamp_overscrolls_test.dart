@@ -1,9 +1,9 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 // Assuming that the test container is 800x600. The height of the
 // viewport's contents is 650.0, the top and bottom text children
@@ -11,139 +11,129 @@ import 'package:flutter/widgets.dart';
 // The top of the bottom widget is at 550 (the top of the top widget
 // is at 0). The top of the bottom widget is 500 when it has been
 // scrolled completely into view.
-Widget buildFrame(ScrollableEdge clampedEdge) {
-  return new ClampOverscrolls(
-    edge: clampedEdge,
-    child: new ScrollableViewport(
-      scrollableKey: new UniqueKey(),
-      child: new SizedBox(
-        height: 650.0,
-        child: new Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            new SizedBox(height: 100.0, child: new Text('top')),
-            new Flexible(child: new Container()),
-            new SizedBox(height: 100.0, child: new Text('bottom')),
-          ]
-        )
-      )
-    )
+Widget buildFrame(ScrollPhysics physics, {ScrollController? scrollController}) {
+  return SingleChildScrollView(
+    key: UniqueKey(),
+    physics: physics,
+    controller: scrollController,
+    child: SizedBox(
+      height: 650.0,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        textDirection: TextDirection.ltr,
+        children: <Widget>[
+          const SizedBox(height: 100.0, child: Text('top', textDirection: TextDirection.ltr)),
+          Expanded(child: Container()),
+          const SizedBox(height: 100.0, child: Text('bottom', textDirection: TextDirection.ltr)),
+        ],
+      ),
+    ),
   );
 }
 
 void main() {
-  testWidgets('ClampOverscrolls', (WidgetTester tester) async {
-
+  testWidgets('ClampingScrollPhysics', (WidgetTester tester) async {
     // Scroll the target text widget by offset and then return its origin
     // in global coordinates.
-    Future<Point> locationAfterScroll(String target, Offset offset) async {
-      await tester.scrollAt(tester.getTopLeft(find.text(target)), offset);
+    Future<Offset> locationAfterScroll(String target, Offset offset) async {
+      await tester.dragFrom(tester.getTopLeft(find.text(target)), offset);
       await tester.pump();
       final RenderBox textBox = tester.renderObject(find.text(target));
-      final Point widgetOrigin = textBox.localToGlobal(Point.origin);
+      final Offset widgetOrigin = textBox.localToGlobal(Offset.zero);
       await tester.pump(const Duration(seconds: 1)); // Allow overscroll to settle
-      return new Future<Point>.value(widgetOrigin);
+      return Future<Offset>.value(widgetOrigin);
     }
 
-    // Each of the blocks below test overscrolling the top and bottom
-    // with a value for ClampOverscrolls.edge.
-
-    await tester.pumpWidget(buildFrame(ScrollableEdge.none));
-    Point origin = await locationAfterScroll('top', const Offset(0.0, 400.0));
-    expect(origin.y, greaterThan(0.0));
+    await tester.pumpWidget(buildFrame(const BouncingScrollPhysics()));
+    Offset origin = await locationAfterScroll('top', const Offset(0.0, 400.0));
+    expect(origin.dy, greaterThan(0.0));
     origin = await locationAfterScroll('bottom', const Offset(0.0, -400.0));
-    expect(origin.y, lessThan(500.0));
+    expect(origin.dy, lessThan(500.0));
 
-
-    await tester.pumpWidget(buildFrame(ScrollableEdge.both));
+    await tester.pumpWidget(buildFrame(const ClampingScrollPhysics()));
     origin = await locationAfterScroll('top', const Offset(0.0, 400.0));
-    expect(origin.y, equals(0.0));
+    expect(origin.dy, equals(0.0));
     origin = await locationAfterScroll('bottom', const Offset(0.0, -400.0));
-    expect(origin.y, equals(500.0));
-
-    await tester.pumpWidget(buildFrame(ScrollableEdge.leading));
-    origin = await locationAfterScroll('top', const Offset(0.0, 400.0));
-    expect(origin.y, equals(0.0));
-    origin = await locationAfterScroll('bottom', const Offset(0.0, -400.0));
-    expect(origin.y, lessThan(500.0));
-
-    await tester.pumpWidget(buildFrame(ScrollableEdge.trailing));
-    origin = await locationAfterScroll('top', const Offset(0.0, 400.0));
-    expect(origin.y, greaterThan(0.0));
-    origin = await locationAfterScroll('bottom', const Offset(0.0, -400.0));
-    expect(origin.y, equals(500.0));
+    expect(origin.dy, equals(500.0));
   });
 
-  testWidgets('ClampOverscrolls affects scrollOffset not virtualScrollOffset', (WidgetTester tester) async {
+  testWidgets('ClampingScrollPhysics affects ScrollPosition', (WidgetTester tester) async {
+    // BouncingScrollPhysics
 
-    // ClampOverscrolls.edge == ScrollableEdge.none
+    await tester.pumpWidget(buildFrame(const BouncingScrollPhysics()));
+    ScrollableState scrollable = tester.state(find.byType(Scrollable));
 
-    await tester.pumpWidget(buildFrame(ScrollableEdge.none));
-    StatefulElement statefulElement = tester.element(find.byType(Scrollable));
-    ScrollableState scrollable = statefulElement.state;
-
-    await tester.scrollAt(tester.getTopLeft(find.text('top')), const Offset(0.0, 400.0));
+    await tester.dragFrom(tester.getTopLeft(find.text('top')), const Offset(0.0, 400.0));
     await tester.pump();
-    expect(scrollable.scrollOffset, lessThan(0.0));
-    expect(scrollable.virtualScrollOffset, equals(scrollable.scrollOffset));
+    expect(scrollable.position.pixels, lessThan(0.0));
     await tester.pump(const Duration(seconds: 1)); // Allow overscroll to settle
 
-    await tester.scrollAt(tester.getTopLeft(find.text('bottom')), const Offset(0.0, -400.0));
+    await tester.dragFrom(tester.getTopLeft(find.text('bottom')), const Offset(0.0, -400.0));
     await tester.pump();
-    expect(scrollable.scrollOffset, greaterThan(0.0));
-    expect(scrollable.virtualScrollOffset, equals(scrollable.scrollOffset));
+    expect(scrollable.position.pixels, greaterThan(0.0));
     await tester.pump(const Duration(seconds: 1)); // Allow overscroll to settle
 
-    // ClampOverscrolls.edge == ScrollableEdge.both
+    // ClampingScrollPhysics
 
-    await tester.pumpWidget(buildFrame(ScrollableEdge.both));
-    statefulElement = tester.element(find.byType(Scrollable));
-    scrollable = statefulElement.state;
+    await tester.pumpWidget(buildFrame(const ClampingScrollPhysics()));
+    scrollable = scrollable = tester.state(find.byType(Scrollable));
 
-    await tester.scrollAt(tester.getTopLeft(find.text('top')), const Offset(0.0, 400.0));
+    await tester.dragFrom(tester.getTopLeft(find.text('top')), const Offset(0.0, 400.0));
     await tester.pump();
-    expect(scrollable.scrollOffset, equals(0.0));
-    expect(scrollable.virtualScrollOffset, lessThan(0.0));
+    expect(scrollable.position.pixels, equals(0.0));
     await tester.pump(const Duration(seconds: 1)); // Allow overscroll to settle
 
-    await tester.scrollAt(tester.getTopLeft(find.text('bottom')), const Offset(0.0, -400.0));
+    await tester.dragFrom(tester.getTopLeft(find.text('bottom')), const Offset(0.0, -400.0));
     await tester.pump();
-    expect(scrollable.scrollOffset, equals(50.0));
-    expect(scrollable.virtualScrollOffset, greaterThan(50.0));
+    expect(scrollable.position.pixels, equals(50.0));
+  });
 
-    // ClampOverscrolls.edge == ScrollableEdge.leading
+  testWidgets('ClampingScrollPhysics handles out of bounds ScrollPosition - initialScrollOffset', (
+    WidgetTester tester,
+  ) async {
+    Future<void> testOutOfBounds(
+      ScrollPhysics physics,
+      double initialOffset,
+      double expectedOffset,
+    ) async {
+      final scrollController = ScrollController(initialScrollOffset: initialOffset);
+      addTearDown(scrollController.dispose);
+      await tester.pumpWidget(buildFrame(physics, scrollController: scrollController));
+      final ScrollableState scrollable = tester.state(find.byType(Scrollable));
 
-    await tester.pumpWidget(buildFrame(ScrollableEdge.leading));
-    statefulElement = tester.element(find.byType(Scrollable));
-    scrollable = statefulElement.state;
+      // The initialScrollOffset will be corrected during the first frame.
+      expect(scrollable.position.pixels, equals(expectedOffset));
+    }
 
-    await tester.scrollAt(tester.getTopLeft(find.text('top')), const Offset(0.0, 400.0));
-    await tester.pump();
-    expect(scrollable.scrollOffset, equals(0.0));
-    expect(scrollable.virtualScrollOffset, lessThan(0.0));
-    await tester.pump(const Duration(seconds: 1)); // Allow overscroll to settle
+    await testOutOfBounds(const ClampingScrollPhysics(), -400.0, 0.0);
+    await testOutOfBounds(const ClampingScrollPhysics(), 800.0, 50.0);
+  });
 
-    await tester.scrollAt(tester.getTopLeft(find.text('bottom')), const Offset(0.0, -400.0));
-    await tester.pump();
-    expect(scrollable.scrollOffset, greaterThan(0.0));
-    expect(scrollable.virtualScrollOffset, equals(scrollable.scrollOffset));
+  testWidgets('ClampingScrollPhysics handles out of bounds ScrollPosition - jumpTo', (
+    WidgetTester tester,
+  ) async {
+    Future<void> testOutOfBounds(
+      ScrollPhysics physics,
+      double targetOffset,
+      double endingOffset,
+    ) async {
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
+      await tester.pumpWidget(buildFrame(physics, scrollController: scrollController));
+      final ScrollableState scrollable = tester.state(find.byType(Scrollable));
 
-    // ClampOverscrolls.edge == ScrollableEdge.trailing
+      expect(scrollable.position.pixels, equals(0.0));
 
-    await tester.pumpWidget(buildFrame(ScrollableEdge.trailing));
-    statefulElement = tester.element(find.byType(Scrollable));
-    scrollable = statefulElement.state;
+      scrollController.jumpTo(targetOffset);
+      await tester.pump();
 
-    await tester.scrollAt(tester.getTopLeft(find.text('top')), const Offset(0.0, 400.0));
-    await tester.pump();
-    expect(scrollable.scrollOffset, lessThan(0.0));
-    expect(scrollable.virtualScrollOffset, equals(scrollable.scrollOffset));
-    expect(scrollable.virtualScrollOffset, equals(scrollable.scrollOffset));
-    await tester.pump(const Duration(seconds: 1)); // Allow overscroll to settle
+      expect(scrollable.position.pixels, equals(targetOffset));
 
-    await tester.scrollAt(tester.getTopLeft(find.text('bottom')), const Offset(0.0, -400.0));
-    await tester.pump();
-    expect(scrollable.scrollOffset, equals(50.0));
-    expect(scrollable.virtualScrollOffset, greaterThan(50.0));
+      await tester.pump(const Duration(seconds: 1)); // Allow overscroll animation to settle
+      expect(scrollable.position.pixels, equals(endingOffset));
+    }
+
+    await testOutOfBounds(const ClampingScrollPhysics(), -400.0, 0.0);
+    await testOutOfBounds(const ClampingScrollPhysics(), 800.0, 50.0);
   });
 }

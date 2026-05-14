@@ -1,4 +1,4 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -8,6 +8,9 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+
+// The FlutterView into which this example will draw; set in the main method.
+late final ui.FlutterView view;
 
 void beginFrame(Duration timeStamp) {
   // The timeStamp argument to beginFrame indicates the timing information we
@@ -19,41 +22,48 @@ void beginFrame(Duration timeStamp) {
 
   // PAINT
 
-  ui.Rect paintBounds = ui.Point.origin & (ui.window.physicalSize / ui.window.devicePixelRatio);
-  ui.PictureRecorder recorder = new ui.PictureRecorder();
-  ui.Canvas canvas = new ui.Canvas(recorder, paintBounds);
+  final ui.Rect paintBounds = ui.Offset.zero & (view.physicalSize / view.devicePixelRatio);
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder, paintBounds);
   canvas.translate(paintBounds.width / 2.0, paintBounds.height / 2.0);
 
   // Here we determine the rotation according to the timeStamp given to us by
   // the engine.
-  double t = timeStamp.inMicroseconds / Duration.MICROSECONDS_PER_MILLISECOND / 1800.0;
-  canvas.rotate(math.PI * (t % 1.0));
+  final double t = timeStamp.inMicroseconds / Duration.microsecondsPerMillisecond / 1800.0;
+  canvas.rotate(math.pi * (t % 1.0));
 
-  canvas.drawRect(new ui.Rect.fromLTRB(-100.0, -100.0, 100.0, 100.0),
-                  new ui.Paint()..color = const ui.Color.fromARGB(255, 0, 255, 0));
-  ui.Picture picture = recorder.endRecording();
+  canvas.drawRect(
+    const ui.Rect.fromLTRB(-100.0, -100.0, 100.0, 100.0),
+    ui.Paint()..color = const ui.Color.fromARGB(255, 0, 255, 0),
+  );
+  final ui.Picture picture = recorder.endRecording();
 
   // COMPOSITE
 
-  final double devicePixelRatio = ui.window.devicePixelRatio;
-  Float64List deviceTransform = new Float64List(16)
+  final double devicePixelRatio = view.devicePixelRatio;
+  final deviceTransform = Float64List(16)
     ..[0] = devicePixelRatio
     ..[5] = devicePixelRatio
     ..[10] = 1.0
     ..[15] = 1.0;
-  ui.SceneBuilder sceneBuilder = new ui.SceneBuilder()
+  final sceneBuilder = ui.SceneBuilder()
     ..pushTransform(deviceTransform)
     ..addPicture(ui.Offset.zero, picture)
     ..pop();
-  ui.window.render(sceneBuilder.build());
+  view.render(sceneBuilder.build());
 
   // After rendering the current frame of the animation, we ask the engine to
   // schedule another frame. The engine will call beginFrame again when its time
   // to produce the next frame.
-  ui.window.scheduleFrame();
+  ui.PlatformDispatcher.instance.scheduleFrame();
 }
 
 void main() {
-  ui.window.onBeginFrame = beginFrame;
-  ui.window.scheduleFrame();
+  // TODO(goderbauer): Create a window if embedder doesn't provide an implicit view to draw into.
+  assert(ui.PlatformDispatcher.instance.implicitView != null);
+  view = ui.PlatformDispatcher.instance.implicitView!;
+
+  ui.PlatformDispatcher.instance
+    ..onBeginFrame = beginFrame
+    ..scheduleFrame();
 }

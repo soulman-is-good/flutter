@@ -1,58 +1,64 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import 'package:flutter/rendering.dart';
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 import 'rendering_tester.dart';
 
 void main() {
-  test('RenderPositionedBox expands', () {
-    RenderConstrainedBox sizer = new RenderConstrainedBox(
-      additionalConstraints: new BoxConstraints.tight(new Size(100.0, 100.0)),
-      child: new RenderDecoratedBox(decoration: new BoxDecoration())
-    );
-    RenderPositionedBox positioner = new RenderPositionedBox(child: sizer);
-    layout(positioner, constraints: new BoxConstraints.loose(new Size(200.0, 200.0)));
+  TestRenderingFlutterBinding.ensureInitialized();
 
-    expect(positioner.size.width, equals(200.0), reason: "positioner width");
-    expect(positioner.size.height, equals(200.0), reason: "positioner height");
+  test('RenderPositionedBox expands', () {
+    final sizer = RenderConstrainedBox(
+      additionalConstraints: BoxConstraints.tight(const Size(100.0, 100.0)),
+      child: RenderDecoratedBox(decoration: const BoxDecoration()),
+    );
+    final positioner = RenderPositionedBox(child: sizer);
+    layout(positioner, constraints: BoxConstraints.loose(const Size(200.0, 200.0)));
+
+    expect(positioner.size.width, equals(200.0), reason: 'positioner width');
+    expect(positioner.size.height, equals(200.0), reason: 'positioner height');
   });
 
   test('RenderPositionedBox shrink wraps', () {
-    RenderConstrainedBox sizer = new RenderConstrainedBox(
-      additionalConstraints: new BoxConstraints.tight(new Size(100.0, 100.0)),
-      child: new RenderDecoratedBox(decoration: new BoxDecoration())
+    final sizer = RenderConstrainedBox(
+      additionalConstraints: BoxConstraints.tight(const Size(100.0, 100.0)),
+      child: RenderDecoratedBox(decoration: const BoxDecoration()),
     );
-    RenderPositionedBox positioner = new RenderPositionedBox(child: sizer, widthFactor: 1.0);
-    layout(positioner, constraints: new BoxConstraints.loose(new Size(200.0, 200.0)));
+    final positioner = RenderPositionedBox(child: sizer, widthFactor: 1.0);
+    layout(positioner, constraints: BoxConstraints.loose(const Size(200.0, 200.0)));
 
-    expect(positioner.size.width, equals(100.0), reason: "positioner width");
-    expect(positioner.size.height, equals(200.0), reason: "positioner height");
+    expect(positioner.size.width, equals(100.0), reason: 'positioner width');
+    expect(positioner.size.height, equals(200.0), reason: 'positioner height');
 
     positioner.widthFactor = null;
     positioner.heightFactor = 1.0;
     pumpFrame();
 
-    expect(positioner.size.width, equals(200.0), reason: "positioner width");
-    expect(positioner.size.height, equals(100.0), reason: "positioner height");
+    expect(positioner.size.width, equals(200.0), reason: 'positioner width');
+    expect(positioner.size.height, equals(100.0), reason: 'positioner height');
 
     positioner.widthFactor = 1.0;
     pumpFrame();
 
-    expect(positioner.size.width, equals(100.0), reason: "positioner width");
-    expect(positioner.size.height, equals(100.0), reason: "positioner height");
+    expect(positioner.size.width, equals(100.0), reason: 'positioner width');
+    expect(positioner.size.height, equals(100.0), reason: 'positioner height');
   });
 
   test('RenderPositionedBox width and height factors', () {
-    RenderConstrainedBox sizer = new RenderConstrainedBox(
-      additionalConstraints: new BoxConstraints.tight(new Size(100.0, 100.0)),
-      child: new RenderDecoratedBox(decoration: new BoxDecoration())
+    final sizer = RenderConstrainedBox(
+      additionalConstraints: BoxConstraints.tight(const Size(100.0, 100.0)),
+      child: RenderDecoratedBox(decoration: const BoxDecoration()),
     );
-    RenderPositionedBox positioner = new RenderPositionedBox(child: sizer, widthFactor: 1.0, heightFactor: 0.0);
-    layout(positioner, constraints: new BoxConstraints.loose(new Size(200.0, 200.0)));
+    final positioner = RenderPositionedBox(child: sizer, widthFactor: 1.0, heightFactor: 0.0);
+    layout(positioner, constraints: BoxConstraints.loose(const Size(200.0, 200.0)));
 
+    expect(positioner.computeMinIntrinsicWidth(200), equals(100.0));
+    expect(positioner.computeMaxIntrinsicWidth(200), equals(100.0));
+    expect(positioner.computeMinIntrinsicHeight(200), equals(0));
+    expect(positioner.computeMaxIntrinsicHeight(200), equals(0));
     expect(positioner.size.width, equals(100.0));
     expect(positioner.size.height, equals(0.0));
 
@@ -60,6 +66,10 @@ void main() {
     positioner.heightFactor = 0.5;
     pumpFrame();
 
+    expect(positioner.computeMinIntrinsicWidth(200), equals(50.0));
+    expect(positioner.computeMaxIntrinsicWidth(200), equals(50.0));
+    expect(positioner.computeMinIntrinsicHeight(200), equals(50.0));
+    expect(positioner.computeMaxIntrinsicHeight(200), equals(50.0));
     expect(positioner.size.width, equals(50.0));
     expect(positioner.size.height, equals(50.0));
 
@@ -67,6 +77,10 @@ void main() {
     positioner.heightFactor = null;
     pumpFrame();
 
+    expect(positioner.computeMinIntrinsicWidth(200), equals(100.0));
+    expect(positioner.computeMaxIntrinsicWidth(200), equals(100.0));
+    expect(positioner.computeMinIntrinsicHeight(200), equals(100.0));
+    expect(positioner.computeMaxIntrinsicHeight(200), equals(100.0));
     expect(positioner.size.width, equals(200.0));
     expect(positioner.size.height, equals(200.0));
   });

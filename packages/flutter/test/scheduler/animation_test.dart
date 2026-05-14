@@ -1,25 +1,28 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:test/test.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
 
-class TestSchedulerBinding extends BindingBase with SchedulerBinding { }
+import 'scheduler_tester.dart';
+
+class TestSchedulerBinding extends BindingBase with SchedulerBinding, ServicesBinding {}
 
 void main() {
-  SchedulerBinding scheduler = new TestSchedulerBinding();
+  final SchedulerBinding scheduler = TestSchedulerBinding();
 
-  test("Check for a time dilation being in effect", () {
+  test('Check for a time dilation being in effect', () {
     expect(timeDilation, equals(1.0));
   });
 
-  test("Can cancel queued callback", () {
-    int secondId;
+  test('Can cancel queued callback', () {
+    late int secondId;
 
-    bool firstCallbackRan = false;
-    bool secondCallbackRan = false;
+    var firstCallbackRan = false;
+    var secondCallbackRan = false;
 
     void firstCallback(Duration timeStamp) {
       expect(firstCallbackRan, isFalse);
@@ -39,7 +42,7 @@ void main() {
     scheduler.scheduleFrameCallback(firstCallback);
     secondId = scheduler.scheduleFrameCallback(secondCallback);
 
-    scheduler.handleBeginFrame(const Duration(milliseconds: 16));
+    tick(const Duration(milliseconds: 16));
 
     expect(firstCallbackRan, isTrue);
     expect(secondCallbackRan, isFalse);
@@ -47,7 +50,7 @@ void main() {
     firstCallbackRan = false;
     secondCallbackRan = false;
 
-    scheduler.handleBeginFrame(const Duration(milliseconds: 32));
+    tick(const Duration(milliseconds: 32));
 
     expect(firstCallbackRan, isFalse);
     expect(secondCallbackRan, isFalse);

@@ -1,53 +1,74 @@
 @ECHO off
-REM Copyright 2015 The Chromium Authors. All rights reserved.
+REM Copyright 2014 The Flutter Authors. All rights reserved.
 REM Use of this source code is governed by a BSD-style license that can be
 REM found in the LICENSE file.
 
-SETLOCAL ENABLEDELAYEDEXPANSION
-FOR %%i IN ("%~dp0..") DO SET "flutter_root=%%~fi" REM Get the parent directory
-SET flutter_tools_dir=%flutter_root%\packages\flutter_tools
-SET flutter_dir=%flutter_root%\packages\flutter
-SET snapshot_path=%flutter_root%\bin\cache\flutter_tools.snapshot
-SET stamp_path=%flutter_root%\bin\cache\flutter_tools.stamp
-SET script_path=%flutter_tools_dir%\bin\flutter_tools.dart
-REM TODO: Don't require dart to be on the user's path
-SET dart=dart
+REM ---------------------------------- NOTE ----------------------------------
+REM
+REM Please keep the logic in this file consistent with the logic in the
+REM `flutter` script in the same directory to ensure that Flutter & Dart
+REM continue to work across all platforms!
+REM
+REM --------------------------------------------------------------------------
 
-REM Set current working directory to the flutter directory
-PUSHD %flutter_root%
-REM IF doesn't have an "or". Instead, just use GOTO
-FOR /f %%r IN ('git rev-parse HEAD') DO SET revision=%%r
-IF NOT EXIST %snapshot_path% GOTO do_snapshot
-IF NOT EXIST %stamp_path% GOTO do_snapshot
-FOR /f "delims=" %%x in (%stamp_path%) do set stamp_value=%%x
-IF "!stamp_value!" NEQ "!revision!" GOTO do_snapshot
+SETLOCAL
 
-REM Getting modified timestamps in a batch file is ... troublesome
-REM More info: http://stackoverflow.com/questions/1687014/how-do-i-compare-timestamps-of-files-in-a-dos-batch-script
-FOR %%f IN (%flutter_tools_dir%\pubspec.yaml) DO SET yamlt=%%~tf
-FOR %%a IN (%flutter_tools_dir%\pubspec.lock) DO SET lockt=%%~ta
-IF !lockt! LSS !yamlt! GOTO do_snapshot
+REM To debug the tool, you can uncomment the following line to enable debug mode:
+REM SET FLUTTER_TOOL_ARGS="--enable-asserts %FLUTTER_TOOL_ARGS%"
 
-GOTO :after_snapshot
+FOR %%i IN ("%~dp0..") DO SET FLUTTER_ROOT=%%~fi
 
-:do_snapshot
-CD "%flutter_tools_dir%"
-ECHO Updating flutter tool...
-CALL pub.bat get
-CD "%flutter_dir%"
-REM Allows us to check if sky_engine's REVISION is correct
-CALL pub.bat get
-CD "%flutter_root%"
-CALL %dart% --snapshot="%snapshot_path%" --packages="%flutter_tools_dir%\.packages" "%script_path%"
-<nul SET /p=%revision%> "%stamp_path%"
+REM If available, add location of bundled mingit to PATH
+SET mingit_path=%FLUTTER_ROOT%\bin\mingit\cmd
+IF EXIST "%mingit_path%" SET PATH=%PATH%;%mingit_path%
 
-:after_snapshot
-
-REM Go back to last working directory
-POPD
-CALL %dart% "%snapshot_path%" %*
-
-IF /I "%ERRORLEVEL%" EQU "253" (
-   CALL %dart% --snapshot="%snapshot_path%" --packages="%flutter_tools_dir%\.packages" "%script_path%"
-   CALL %dart% "%snapshot_path%" %*
+REM Test if Git is available on the host
+WHERE /Q git
+IF "%ERRORLEVEL%" NEQ "0" (
+  ECHO Error: Unable to find git in your PATH.
+  EXIT /B 1
 )
+
+REM Detect which PowerShell executable is available on the host
+REM PowerShell version <= 5: PowerShell.exe
+REM PowerShell version >= 6: pwsh.exe
+WHERE /Q pwsh && (
+    SET "powershell_executable=call pwsh"
+) || WHERE /Q PowerShell.exe && (
+    SET powershell_executable=PowerShell.exe
+) || (
+    ECHO Error: PowerShell executable not found.                        1>&2
+    ECHO        Either pwsh.exe or PowerShell.exe must be in your PATH. 1>&2
+    EXIT /B 1
+)
+
+REM  Test if the flutter directory is a git clone, otherwise git rev-parse HEAD would fail
+IF NOT EXIST "%flutter_root%\.git" (
+  ECHO Error: The Flutter directory is not a clone of the GitHub project.
+  ECHO        The flutter tool requires Git in order to operate properly;
+  ECHO        to set up Flutter, run the following command:
+  ECHO        git clone -b stable https://github.com/flutter/flutter.git
+  EXIT 1
+)
+
+REM Include shared scripts in shared.bat
+SET shared_bin=%FLUTTER_ROOT%\bin\internal\shared.bat
+CALL "%shared_bin%"
+
+SET flutter_tools_dir=%FLUTTER_ROOT%\packages\flutter_tools
+SET cache_dir=%FLUTTER_ROOT%\bin\cache
+SET snapshot_path=%cache_dir%\flutter_tools.snapshot
+SET dart_sdk_path=%cache_dir%\dart-sdk
+SET dart=%dart_sdk_path%\bin\dart.exe
+
+SET exit_with_errorlevel=%FLUTTER_ROOT%/bin/internal/exit_with_errorlevel.bat
+
+REM Chaining the call to 'dart' and 'exit' with an ampersand ensures that
+REM Windows reads both commands into memory once before executing them. This
+REM avoids nasty errors that may otherwise occur when the dart command (e.g. as
+REM part of 'flutter upgrade') modifies this batch script while it is executing.
+REM
+REM Do not use the CALL command in the next line to execute Dart. CALL causes
+REM Windows to re-read the line from disk after the CALL command has finished
+REM regardless of the ampersand chain.
+"%dart%" --packages="%flutter_tools_dir%\.dart_tool\package_config.json" %FLUTTER_TOOL_ARGS% "%snapshot_path%" %* & "%exit_with_errorlevel%"

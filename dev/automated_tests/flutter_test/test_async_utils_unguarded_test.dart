@@ -1,19 +1,29 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Future<Null> helperFunction(WidgetTester tester) async {
+class TestTestBinding extends AutomatedTestWidgetsFlutterBinding {
+  @override
+  DebugPrintCallback get debugPrintOverride => testPrint;
+  static void testPrint(String? message, {int? wrapWidth}) {
+    print(message);
+  }
+}
+
+Future<void> helperFunction(WidgetTester tester) async {
   await tester.pump();
 }
 
 void main() {
-  testWidgets('TestAsyncUtils - handling unguarded async helper functions', (WidgetTester tester) async {
-    debugPrint = (String message, { int wrapWidth }) { print(message); };
-    helperFunction(tester);
-    helperFunction(tester);
+  TestTestBinding();
+  testWidgets('TestAsyncUtils - handling unguarded async helper functions', (
+    WidgetTester tester,
+  ) async {
+    helperFunction(tester); // ignore: unawaited_futures
+    helperFunction(tester); // ignore: unawaited_futures
     // this should fail
   });
 }

@@ -1,31 +1,30 @@
 name: flutter_driver
-version: 0.0.1
 description: Integration and performance test API for Flutter applications
-homepage: http://flutter.io
-author: Flutter Authors <flutter-dev@googlegroups.com>
+homepage: https://flutter.dev
 
 environment:
-  sdk: '>=1.19.0 <2.0.0'
+  sdk: ^3.10.0-0
+
+resolution: workspace
 
 dependencies:
-
-  # version 0.13.6+1 does not return the value from the command
-  # causing flutter tools to always have exit code 0
-  # see https://github.com/flutter/flutter/issues/6766
-  args: 0.13.6
-
-  file: '^0.1.0'
-  json_rpc_2: '^2.0.0'
-  matcher: '>=0.12.0 <1.0.0'
-  path: '^1.3.0'
-  web_socket_channel: '^1.0.0'
-  vm_service_client: '^0.2.0'
+  file: any
   flutter:
     sdk: flutter
   flutter_test:
     sdk: flutter
+  fuchsia_remote_debug_protocol:
+    sdk: flutter
+  path: any
+  meta: any
+  vm_service: any
+  webdriver: any
+
+  matcher: any
 
 dev_dependencies:
-  test: 0.12.15+4
-  mockito: ^1.0.0
-  quiver: ^0.21.4
+  fake_async: any
+  test: any
+
+
+# PUBSPEC CHECKSUM: r4u6gv

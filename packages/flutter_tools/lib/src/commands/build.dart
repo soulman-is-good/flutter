@@ -1,106 +1,187 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
-import 'dart:io';
-
 import 'package:meta/meta.dart';
+import 'package:process/process.dart';
 
-import '../build_info.dart';
-import '../globals.dart';
+import '../android/android_sdk.dart';
+import '../artifacts.dart';
+import '../base/config.dart';
+import '../base/file_system.dart';
+import '../base/logger.dart';
+import '../base/os.dart';
+import '../base/platform.dart';
+import '../base/process.dart';
+import '../base/template.dart';
+import '../base/terminal.dart';
+import '../build_system/build_system.dart';
+import '../cache.dart';
+import '../features.dart';
+import '../ios/code_signing.dart';
+import '../ios/plist_parser.dart';
+import '../macos/xcode.dart';
 import '../runner/flutter_command.dart';
-import '../base/utils.dart';
+import '../version.dart';
+import 'build_aar.dart';
 import 'build_apk.dart';
-import 'build_aot.dart';
-import 'build_flx.dart';
+import 'build_appbundle.dart';
+import 'build_bundle.dart';
 import 'build_ios.dart';
+import 'build_ios_framework.dart';
+import 'build_linux.dart';
+import 'build_macos.dart';
+import 'build_macos_framework.dart';
+import 'build_swift_package.dart';
+import 'build_web.dart';
+import 'build_windows.dart';
+import 'darwin_add_to_app.dart';
 
 class BuildCommand extends FlutterCommand {
-  BuildCommand({bool verboseHelp: false}) {
-    addSubcommand(new BuildApkCommand());
-    addSubcommand(new BuildAotCommand());
-    addSubcommand(new BuildCleanCommand());
-    addSubcommand(new BuildIOSCommand());
-    addSubcommand(new BuildFlxCommand(verboseHelp: verboseHelp));
+  BuildCommand({
+    required Artifacts artifacts,
+    required Cache cache,
+    required FileSystem fileSystem,
+    required FlutterVersion flutterVersion,
+    required BuildSystem buildSystem,
+    required OperatingSystemUtils osUtils,
+    required Logger logger,
+    required AndroidSdk? androidSdk,
+    required Config config,
+    required Platform platform,
+    required ProcessUtils processUtils,
+    required ProcessManager processManager,
+    required FileSystemUtils fileSystemUtils,
+    required TemplateRenderer templateRenderer,
+    required Terminal terminal,
+    required PlistParser plistParser,
+    required Xcode? xcode,
+    bool verboseHelp = false,
+  }) {
+    _addSubcommand(
+      BuildAarCommand(
+        fileSystem: fileSystem,
+        androidSdk: androidSdk,
+        logger: logger,
+        verboseHelp: verboseHelp,
+      ),
+    );
+    _addSubcommand(BuildApkCommand(logger: logger, verboseHelp: verboseHelp));
+    _addSubcommand(BuildAppBundleCommand(logger: logger, verboseHelp: verboseHelp));
+    _addSubcommand(BuildIOSCommand(logger: logger, verboseHelp: verboseHelp));
+    _addSubcommand(
+      BuildIOSFrameworkCommand(
+        logger: logger,
+        buildSystem: buildSystem,
+        verboseHelp: verboseHelp,
+        codesign: DarwinAddToAppCodesigning(
+          logger: logger,
+          xcodeCodeSigningSettings: XcodeCodeSigningSettings(
+            config: config,
+            logger: logger,
+            platform: platform,
+            processUtils: processUtils,
+            fileSystem: fileSystem,
+            fileSystemUtils: fileSystemUtils,
+            terminal: terminal,
+            plistParser: plistParser,
+          ),
+        ),
+      ),
+    );
+    _addSubcommand(
+      BuildMacOSFrameworkCommand(
+        logger: logger,
+        buildSystem: buildSystem,
+        verboseHelp: verboseHelp,
+        codesign: DarwinAddToAppCodesigning(
+          logger: logger,
+          xcodeCodeSigningSettings: XcodeCodeSigningSettings(
+            config: config,
+            logger: logger,
+            platform: platform,
+            processUtils: processUtils,
+            fileSystem: fileSystem,
+            fileSystemUtils: fileSystemUtils,
+            terminal: terminal,
+            plistParser: plistParser,
+          ),
+        ),
+      ),
+    );
+    _addSubcommand(
+      BuildSwiftPackage(
+        logger: logger,
+        analytics: analytics,
+        artifacts: artifacts,
+        buildSystem: buildSystem,
+        cache: cache,
+        featureFlags: featureFlags,
+        fileSystem: fileSystem,
+        flutterVersion: flutterVersion,
+        platform: platform,
+        processManager: processManager,
+        templateRenderer: templateRenderer,
+        xcode: xcode,
+        codesign: DarwinAddToAppCodesigning(
+          logger: logger,
+          xcodeCodeSigningSettings: XcodeCodeSigningSettings(
+            config: config,
+            logger: logger,
+            platform: platform,
+            processUtils: processUtils,
+            fileSystem: fileSystem,
+            fileSystemUtils: fileSystemUtils,
+            terminal: terminal,
+            plistParser: plistParser,
+          ),
+        ),
+        verboseHelp: verboseHelp,
+      ),
+    );
+
+    _addSubcommand(BuildIOSArchiveCommand(logger: logger, verboseHelp: verboseHelp));
+    _addSubcommand(BuildBundleCommand(logger: logger, verboseHelp: verboseHelp));
+    _addSubcommand(
+      BuildWebCommand(fileSystem: fileSystem, logger: logger, verboseHelp: verboseHelp),
+    );
+    _addSubcommand(BuildMacosCommand(logger: logger, verboseHelp: verboseHelp));
+    _addSubcommand(
+      BuildLinuxCommand(logger: logger, operatingSystemUtils: osUtils, verboseHelp: verboseHelp),
+    );
+    _addSubcommand(
+      BuildWindowsCommand(logger: logger, operatingSystemUtils: osUtils, verboseHelp: verboseHelp),
+    );
+  }
+
+  void _addSubcommand(BuildSubCommand command) {
+    if (command.supported) {
+      addSubcommand(command);
+    }
   }
 
   @override
-  final String name = 'build';
+  final name = 'build';
 
   @override
-  final String description = 'Flutter build commands.';
+  final description = 'Build an executable app or install bundle.';
 
   @override
-  Future<int> verifyThenRunCommand() async {
-    if (!commandValidator())
-      return 1;
-    return super.verifyThenRunCommand();
-  }
+  String get category => FlutterCommandCategory.project;
 
   @override
-  Future<int> runCommand() => new Future<int>.value(0);
+  Future<FlutterCommandResult> runCommand() async => FlutterCommandResult.fail();
 }
 
 abstract class BuildSubCommand extends FlutterCommand {
-  @override
-  @mustCallSuper
-  Future<int> verifyThenRunCommand() async {
-    if (!commandValidator())
-      return 1;
-    return super.verifyThenRunCommand();
+  BuildSubCommand({required this.logger, required bool verboseHelp}) {
+    requiresPubspecYaml();
+    usesFatalWarningsOption(verboseHelp: verboseHelp);
   }
 
-  @override
-  @mustCallSuper
-  Future<int> runCommand() async {
-    if (isRunningOnBot) {
-      File dotPackages = new File('.packages');
-      printStatus('Contents of .packages:');
-      if (dotPackages.existsSync())
-        printStatus(dotPackages.readAsStringSync());
-      else
-        printError('File not found: ${dotPackages.absolute.path}');
+  @protected
+  final Logger logger;
 
-      File pubspecLock = new File('pubspec.lock');
-      printStatus('Contents of pubspec.lock:');
-      if (pubspecLock.existsSync())
-        printStatus(pubspecLock.readAsStringSync());
-      else
-        printError('File not found: ${pubspecLock.absolute.path}');
-    }
-    return 0;
-  }
-}
-
-class BuildCleanCommand extends FlutterCommand {
-  @override
-  final String name = 'clean';
-
-  @override
-  final String description = 'Delete the build/ directory.';
-
-  @override
-  Future<int> verifyThenRunCommand() async {
-    if (!commandValidator())
-      return 1;
-    return super.verifyThenRunCommand();
-  }
-
-  @override
-  Future<int> runCommand() async {
-    Directory buildDir = new Directory(getBuildDirectory());
-    printStatus("Deleting '${buildDir.path}${Platform.pathSeparator}'.");
-
-    if (!buildDir.existsSync())
-      return 0;
-
-    try {
-      buildDir.deleteSync(recursive: true);
-      return 0;
-    } catch (error) {
-      printError(error.toString());
-      return 1;
-    }
-  }
+  /// Whether this command is supported and should be shown.
+  bool get supported => true;
 }
